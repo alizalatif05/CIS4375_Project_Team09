@@ -1,4 +1,6 @@
-CREATE TABLE User (
+USE MilitiaProtection;
+
+CREATE TABLE IF NOT EXISTS User (
     UserID INT PRIMARY KEY AUTO_INCREMENT,
     User_fName VARCHAR(255) NOT NULL,
     User_lName VARCHAR(255) NOT NULL,
@@ -8,14 +10,15 @@ CREATE TABLE User (
     UserType VARCHAR(50) NOT NULL
 );
 
-CREATE TABLE Inventory (
-    SKU_Number VARCHAR(255) PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE IF NOT EXISTS Inventory (
+    SKU_Number INT PRIMARY KEY AUTO_INCREMENT,
     ItemName VARCHAR(255) NOT NULL,
     Item_Desc TEXT,
     Item_Quantity INT NOT NULL CHECK (Item_Quantity >= 0),
     Deleted ENUM('Yes', 'No') DEFAULT 'No'
+);
 
-CREATE TABLE Customer (
+CREATE TABLE IF NOT EXISTS Customer (
     CustomerID INT PRIMARY KEY AUTO_INCREMENT,
     Customer_fName VARCHAR(255) NOT NULL,
     Customer_lName VARCHAR(255) NOT NULL,
@@ -24,7 +27,7 @@ CREATE TABLE Customer (
     Deleted ENUM('Yes', 'No') DEFAULT 'No'
 );
 
-CREATE TABLE Technician (
+CREATE TABLE IF NOT EXISTS Technician (
     TechID INT PRIMARY KEY AUTO_INCREMENT,
     UserID INT,
     Tech_fName VARCHAR(255) NOT NULL,
@@ -33,7 +36,7 @@ CREATE TABLE Technician (
     FOREIGN KEY (UserID) REFERENCES User(UserID) ON DELETE CASCADE
 );
 
-CREATE TABLE SalesRep (
+CREATE TABLE IF NOT EXISTS SalesRep (
     SalesRepID INT PRIMARY KEY AUTO_INCREMENT,
     UserID INT,
     SalesRep_fName VARCHAR(255) NOT NULL,
@@ -42,7 +45,7 @@ CREATE TABLE SalesRep (
     FOREIGN KEY (UserID) REFERENCES User(UserID) ON DELETE CASCADE
 );
 
-CREATE TABLE Admin (
+CREATE TABLE IF NOT EXISTS Admin (
     AdminID INT PRIMARY KEY AUTO_INCREMENT,
     UserID INT,
     Admin_fName VARCHAR(255) NOT NULL,
@@ -50,7 +53,7 @@ CREATE TABLE Admin (
     FOREIGN KEY (UserID) REFERENCES User(UserID) ON DELETE CASCADE
 );
 
-CREATE TABLE 'Order' (
+CREATE TABLE IF NOT EXISTS `Order` (
     OrderID INT PRIMARY KEY AUTO_INCREMENT,
     CustomerID INT NOT NULL,
     TechID INT NOT NULL,
@@ -61,8 +64,8 @@ CREATE TABLE 'Order' (
     FOREIGN KEY (SalesRepID) REFERENCES SalesRep(SalesRepID) ON DELETE CASCADE
 );
 
-CREATE TABLE OrderItems (
-    SKU_Number VARCHAR(255) NOT NULL,
+CREATE TABLE IF NOT EXISTS OrderItems (
+    SKU_Number INT NOT NULL,
     OrderID INT NOT NULL,
     Deleted ENUM('Yes', 'No') DEFAULT 'No',
     PRIMARY KEY (SKU_Number, OrderID),
@@ -70,8 +73,8 @@ CREATE TABLE OrderItems (
     FOREIGN KEY (OrderID) REFERENCES `Order`(OrderID) ON DELETE CASCADE
 );
 
-CREATE TABLE TechInventory (
-    SKU_Number VARCHAR(255) NOT NULL,
+CREATE TABLE IF NOT EXISTS TechInventory (
+    SKU_Number INT NOT NULL,
     TechID INT NOT NULL,
     Deleted ENUM('Yes', 'No') DEFAULT 'No',
     PRIMARY KEY (SKU_Number, TechID),
