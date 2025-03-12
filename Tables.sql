@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS Customer (
     CustomerID INT PRIMARY KEY AUTO_INCREMENT,
     Customer_fName VARCHAR(255) NOT NULL,
     Customer_lName VARCHAR(255) NOT NULL,
-    CustomerAddress TEXT NOT NULL,
+    CustomerAddress VARCHAR(255) NOT NULL,
     CustomerPhone VARCHAR(20) NOT NULL,
     Deleted ENUM('Yes', 'No') DEFAULT 'No'
 );
