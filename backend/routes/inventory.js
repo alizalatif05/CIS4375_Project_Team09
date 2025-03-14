@@ -121,3 +121,38 @@ router.get('/users/:id', authenticateUser, (req, res) => {
 });
 
 module.exports = router; 
+
+/**
+ * PUT /api/inventory/:id - Update an existing inventory item
+ */
+router.put('/inventory/:id', authenticateUser, (req, res) => {
+    const inventoryId = req.params.id; // Extract inventory ID from URL
+    const { name, quantity, location, category } = req.body; // Extract update data
+
+    // Basic input validation (ensure all required fields are present)
+    if (!name || !quantity || !location || !category) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    // SQL query to update the inventory item
+    const updateQuery = `
+        UPDATE Inventory
+        SET name = ?, quantity = ?, location = ?, category = ?
+        WHERE inventory_id = ?;
+    `;
+
+    // Execute the update query
+    pool.query(updateQuery, [name, quantity, location, category, inventoryId], (err, result) => {
+        if (err) {
+            console.error('Database update error:', err);
+            return res.status(500).json({ message: 'Database query error' });
+        }
+
+        // Check if any rows were affected (i.e., if the item exists)
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Inventory item not found' });
+        }
+
+        return res.status(200).json({ message: 'Inventory item updated successfully' });
+    });
+});
