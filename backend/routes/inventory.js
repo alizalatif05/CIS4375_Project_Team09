@@ -156,3 +156,45 @@ router.put('/inventory/:id', authenticateUser, (req, res) => {
         return res.status(200).json({ message: 'Inventory item updated successfully' });
     });
 });
+
+
+/**
+ * PUT /api/customers/:id - Update an existing customer record (supports partial updates)
+ */
+router.put('/customers/:id', authenticateUser, (req, res) => {
+    const customerId = req.params.id;
+    const updates = req.body; // Extract the fields the user wants to update
+
+    // If no fields are provided, return an error
+    if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: 'At least one field is required for an update' });
+    }
+
+    // Build the dynamic SQL query
+    let query = 'UPDATE Customer SET ';
+    const values = [];
+
+    // Loop through the request body and construct the query dynamically
+    Object.keys(updates).forEach((key, index) => {
+        query += `${key} = ?`;
+        if (index < Object.keys(updates).length - 1) query += ', '; // Add a comma between fields
+        values.push(updates[key]);
+    });
+
+    query += ' WHERE CustomerID = ?;';
+    values.push(customerId); // Append the customer ID for the WHERE clause
+
+    // Execute the update query
+    pool.query(query, values, (err, result) => {
+        if (err) {
+            console.error('Database update error:', err);
+            return res.status(500).json({ message: 'Database query error' });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+
+        return res.status(200).json({ message: 'Customer updated successfully' });
+    });
+});
