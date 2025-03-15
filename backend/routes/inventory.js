@@ -6,15 +6,29 @@ const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddlewa
 
 const router = express.Router(); 
 
-/** ================================
- * 🚀 INVENTORY ROUTES
- * ================================ */
+/** 
+ *  INVENTORY ROUTES
+ */
 
 /**
  * GET /api/inventory - Retrieve all inventory items
  */
 router.get('/inventory', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Inventory', (err, results) => {
+    const { search } = req.query;
+    let query = `
+        SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
+        FROM Inventory
+        WHERE Deleted = 'No'
+    `;
+
+    const values = [];
+
+    if (search) {
+        query += " AND (SKU_Number LIKE ? OR ItemName LIKE ?)";
+        values.push(`%${search}%`, `%${search}%`);
+    }
+
+    pool.query(query, values, (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results);
     });
@@ -24,54 +38,93 @@ router.get('/inventory', authenticateUser, (req, res) => {
  * GET /api/inventory/:sku - Retrieve a single inventory item by SKU
  */
 router.get('/inventory/:sku', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Inventory WHERE SKU_Number = ?', [req.params.sku], (err, results) => {
+    const query = `
+        SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
+        FROM Inventory 
+        WHERE SKU_Number = ? AND Deleted = 'No';
+    `;
+    pool.query(query, [req.params.sku], (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results[0] || {});
     });
 });
 
-/** ================================
- * 👤 CUSTOMER ROUTES
- * ================================ */
+/** 
+ *  CUSTOMER ROUTES
+ */
 
 router.get('/customers', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Customer', (err, results) => {
+    const { search } = req.query;
+    let query = `
+        SELECT CustomerID, Customer_fName AS firstName, Customer_lName AS lastName, 
+               CustomerAddress AS address, CustomerPhone AS phone 
+        FROM Customer
+        WHERE Deleted = 'No'
+    `;
+
+    const values = [];
+
+    if (search) {
+        query += " AND (CustomerID LIKE ? OR Customer_fName LIKE ? OR Customer_lName LIKE ?)";
+        values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    pool.query(query, values, (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results);
     });
 });
 
-router.get('/customers/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Customer WHERE CustomerID = ?', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json(results[0] || {});
-    });
-});
-
-/** ================================
- * 🏗️ TECHNICIAN ROUTES
- * ================================ */
+/**
+ *  TECHNICIAN ROUTES
+  */
 
 router.get('/technicians', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Technician', (err, results) => {
+    const { search } = req.query;
+    let query = `
+        SELECT TechID, UserID, Tech_fName AS firstName, Tech_lName AS lastName 
+        FROM Technician
+        WHERE Deleted = 'No'
+    `;
+
+    const values = [];
+
+    if (search) {
+        query += " AND (TechID LIKE ? OR Tech_fName LIKE ? OR Tech_lName LIKE ?)";
+        values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    pool.query(query, values, (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results);
     });
 });
 
-router.get('/technicians/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Technician WHERE TechID = ?', [req.params.id], (err, results) => {
+
+/**
+ * GET /api/techinventory - Retrieve all technician inventory items
+ */
+router.get('/techinventory', authenticateUser, (req, res) => {
+    const query = `
+        SELECT TechInventory.SKU_Number, TechInventory.TechID, 
+               Inventory.ItemName, Inventory.Item_Desc 
+        FROM TechInventory
+        JOIN Inventory ON TechInventory.SKU_Number = Inventory.SKU_Number
+        WHERE TechInventory.Deleted = 'No';
+    `;
+    
+    pool.query(query, (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json(results[0] || {});
+        res.json(results);
     });
 });
 
-/** ================================
- * 📦 ORDER ROUTES
- * ================================ */
+/** 
+ *  ORDER ROUTES
+ */
 
 router.get('/orders', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Orders', (err, results) => {
+    pool.query('SELECT * FROM `Order` WHERE Deleted = "No"', (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results);
     });
@@ -84,9 +137,47 @@ router.get('/orders/:id', authenticateUser, (req, res) => {
     });
 });
 
-/** ================================
- * 👨‍💼 SALES REPRESENTATIVE ROUTES
- * ================================ */
+/**
+ * GET /api/orderitems - Retrieve all order items
+ */
+router.get('/orderitems', authenticateUser, (req, res) => {
+    const query = `
+        SELECT OrderItems.SKU_Number, OrderItems.OrderID, 
+               Inventory.ItemName, Inventory.Item_Desc 
+        FROM OrderItems
+        JOIN Inventory ON OrderItems.SKU_Number = Inventory.SKU_Number
+        WHERE OrderItems.Deleted = 'No';
+    `;
+
+    pool.query(query, (err, results) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.json(results);
+    });
+});
+
+/**
+ * ADMIN ROUTES
+ **/
+
+/**
+ * GET /api/admins - Retrieve all admin users
+ */
+router.get('/admins', authenticateUser, authorizeAdmin, (req, res) => {
+    const query = `
+        SELECT AdminID, UserID, Admin_fName AS firstName, Admin_lName AS lastName 
+        FROM Admin;
+    `;
+
+    pool.query(query, (err, results) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.json(results);
+    });
+});
+
+
+/** 
+ *  SALES REPRESENTATIVE ROUTES
+ */
 
 router.get('/sales_reps', authenticateUser, (req, res) => {
     pool.query('SELECT * FROM Sales_Rep', (err, results) => {
@@ -102,9 +193,9 @@ router.get('/sales_reps/:id', authenticateUser, (req, res) => {
     });
 });
 
-/** ================================
- * 🔐 USER ROUTES
- * ================================ */
+/** 
+ *  USER ROUTES
+ */
 
 router.get('/users', authenticateUser, (req, res) => {
     pool.query('SELECT * FROM Users', (err, results) => {
@@ -156,7 +247,6 @@ router.put('/inventory/:id', authenticateUser, (req, res) => {
         return res.status(200).json({ message: 'Inventory item updated successfully' });
     });
 });
-
 
 /**
  * PUT /api/customers/:id - Update an existing customer record (supports partial updates)
