@@ -180,14 +180,14 @@ router.get('/admins', authenticateUser, authorizeAdmin, (req, res) => {
  */
 
 router.get('/sales_reps', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Sales_Rep', (err, results) => {
+    pool.query('SELECT * FROM SalesRep', (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results);
     });
 });
 
 router.get('/sales_reps/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Sales_Rep WHERE SalesRepID = ?', [req.params.id], (err, results) => {
+    pool.query('SELECT * FROM SalesRep WHERE SalesRepID = ?', [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results[0] || {});
     });
@@ -198,16 +198,39 @@ router.get('/sales_reps/:id', authenticateUser, (req, res) => {
  */
 
 router.get('/users', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Users', (err, results) => {
+    pool.query('SELECT * FROM User', (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results);
     });
 });
 
 router.get('/users/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Users WHERE UserID = ?', [req.params.id], (err, results) => {
+    pool.query('SELECT * FROM User WHERE UserID = ?', [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results[0] || {});
+    });
+});
+
+router.post ('/users', authenticateUser, authorizeAdmin, (req, res) => {
+    const { User_fName, User_lName, Username, UserPassword, User_Type }  = req.body;
+    
+    if (!User_fName || !User_lName || !Username || !UserPassword) {
+        return res.status(400).json ({ message: 'Missing required fields'});
+    }
+
+    const user = {
+        User_fName,
+        User_lName,
+        Username,
+        UserPassword,
+        User_Type: User_Type || 'admin',
+        Deleted: 'no'
+
+
+    };
+
+    pool.query ('INSERT INTO User SET ?', user, (err, result) => {
+        if (err) return res.status(500).json({ message: 'Error with database', error:err.message});
     });
 });
 

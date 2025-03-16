@@ -4,7 +4,7 @@
       <input v-model="searchQuery" placeholder="Search customers..." />
       <ul>
         <li v-for="customer in filteredCustomers" :key="customer.CustomerID">
-          {{ customer.customer_fname }} {{ customer.customer_lname }} - {{ customer.customerphone }}
+          {{ customer.firstName}} {{ customer.lastName }} - {{ customer.phone }} - {{ customer.address }}
         </li>
       </ul>
     </div>
@@ -31,7 +31,7 @@
     },
     async created() {
       try {
-        const response = await axios.get('http://localhost:5000/api/customers');
+        const response = await axios.get('http://localhost:3000/api/customers');
         this.customers = response.data;
       } catch (error) {
         console.error("Error fetching customers:", error);
