@@ -7,14 +7,14 @@ dotenv.config(); // Load environment variables from .env file
 
 // Create a connection pool to the MySQL RDS instance
 const pool = mysql.createPool({
-    host: process.env.DB_HOST,  // AWS RDS endpoint
-    user: process.env.DB_USER,  // MySQL username
-    password: process.env.DB_PASSWORD,  // MySQL password
-    database: process.env.DB_NAME,  // Target database
-    port: 3306, // Default MySQL port
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+  host: 'database-2.cj442ogn3woj.us-east-1.rds.amazonaws.com',
+  user: 'admin',
+  port: 3306,
+  password: 'Password123!',
+  database: 'MilitiaProtection',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 // Test the database connection
