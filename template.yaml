@@ -1,5 +1,5 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to manage resources for the client platform (without IAM resources)
+AWSTemplateFormatVersion: "2025-03-16"
+Description: CloudFormation template to manage resources for the client platform (without IAM resources, supporting frontend and backend deployment via GitHub)
 
 Parameters:
   VPCCIDR:
@@ -8,12 +8,12 @@ Parameters:
     Description: The CIDR block for the VPC.
   InstanceType:
     Type: String
-    Default: "t3.medium"
-    Description: EC2 instance type for backend services.
+    Default: "t3.micro"
+    Description: EC2 instance type for backend services (Free Tier eligible).
   DBInstanceClass:
     Type: String
-    Default: "db.t3.medium"
-    Description: RDS instance class for MySQL.
+    Default: "db.t3.micro"
+    Description: RDS instance class for MySQL (Free Tier eligible).
   Environment:
     Type: String
     Default: "dev"
@@ -22,20 +22,51 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
     Description: Latest Amazon Linux 2 AMI from SSM Parameter Store.
+  DBUsername:
+    Type: String
+    Default: "admin"
+    Description: Username for MySQL database.
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: Password for MySQL database.
 
 Resources:
-  # VPC and Subnets
+  # VPC and Networking Resources
   VPC:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: !Ref VPCCIDR
-      EnableDnsSupport: 'true'
-      EnableDnsHostnames: 'true'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
       Tags:
         - Key: Name
           Value: !Sub "ClientVPC-${Environment}"
 
-  # Internet Gateway for public subnet connectivity
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: "10.0.1.0/24"
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: "10.0.2.0/24"
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: "10.0.3.0/24"
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -49,188 +80,81 @@ Resources:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
 
-  # Create multiple public subnets in different Availability Zones for high availability
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      CidrBlock: "10.0.1.0/24"
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: 'true'
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientPublicSubnet1-${Environment}"
-
-  PublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      CidrBlock: "10.0.2.0/24"
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: 'true'
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientPublicSubnet2-${Environment}"
-
-  # Route table for public subnets
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientPublicRouteTable-${Environment}"
-
-  DefaultPublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: "0.0.0.0/0"
-      GatewayId: !Ref InternetGateway
-
-  PublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnet1
-
-  PublicSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      SubnetId: !Ref PublicSubnet2
-
-  # Security Groups - separated by purpose
+  # Security Groups
   WebSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable HTTP and HTTPS access
+      GroupDescription: Enable HTTP, HTTPS, and SSH access
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: '0.0.0.0/0'
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
-          FromPort: '443'
-          ToPort: '443'
-          CidrIp: '0.0.0.0/0'
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
         - IpProtocol: tcp
-          FromPort: '22'
-          ToPort: '22'
-          CidrIp: '0.0.0.0/0'
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientWebSG-${Environment}"
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
 
-  DBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable database access
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: '3306'
-          ToPort: '3306'
-          SourceSecurityGroupId: !Ref WebSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientDBSG-${Environment}"
-
-  # EC2 Instances (without IAM role)
-  WebServer:
+  BackendInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref AmiId
       InstanceType: !Ref InstanceType
+      ImageId: !Ref AmiId
+      SubnetId: !Ref PublicSubnet1
       SecurityGroupIds:
         - !Ref WebSecurityGroup
-      SubnetId: !Ref PublicSubnet1
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientWebServer-${Environment}"
       UserData:
         Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          yum update -y
-          yum install -y httpd
-          systemctl start httpd
-          systemctl enable httpd
-          echo "<html><body><h1>Client Web Server</h1><p>Environment: ${Environment}</p></body></html>" > /var/www/html/index.html
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install -y git
+          git clone https://github.com/alizalatif05/CIS4375_Project_Team09.git /home/ec2-user/app
+          cd /home/ec2-user/app
+          ./deploy.sh
 
-  # Load Balancer
-  LoadBalancer:
+  ALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "client-lb-${Environment}"
+      Name: !Sub "ALB-${Environment}"
       Subnets:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
       SecurityGroups:
         - !Ref WebSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientLoadBalancer-${Environment}"
+      Scheme: internet-facing
 
-  # Target Group for Load Balancer
-  TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      HealthCheckPath: "/"
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 5
-      Port: 80
-      Protocol: HTTP
-      VpcId: !Ref VPC
-      TargetType: instance
-      Targets:
-        - Id: !Ref WebServer
-          Port: 80
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientTargetGroup-${Environment}"
-
-  # Listener for Load Balancer
-  Listener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-      LoadBalancerArn: !Ref LoadBalancer
-      Port: 80
-      Protocol: HTTP
-
-  # S3 Buckets for storing customer data and logs
-  S3BucketLogs:
+  S3FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      VersioningConfiguration:
-        Status: Enabled
-      Tags:
-        - Key: Name
-          Value: !Sub "ClientLogsBucket-${Environment}"
+      BucketName: !Sub "client-frontend-${Environment}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "BackendLogs-${Environment}"
+      RetentionInDays: 7
 
 Outputs:
-  LoadBalancerDNSName:
-    Description: "DNS Name of the Load Balancer"
-    Value: !GetAtt LoadBalancer.DNSName
-
-  WebServerIP:
-    Description: "IP Address of the Web Server"
-    Value: !GetAtt WebServer.PublicIp
-
   VPCId:
     Description: "ID of the VPC"
     Value: !Ref VPC
-
-  PublicSubnet1:
-    Description: "ID of the first public subnet"
-    Value: !Ref PublicSubnet1
-
-  PublicSubnet2:
-    Description: "ID of the second public subnet"
-    Value: !Ref PublicSubnet2
+  RDSEndpoint:
+    Description: "RDS MySQL Endpoint"
+    Value: !GetAtt MySQLDatabase.Endpoint.Address
+  BackendPublicIP:
+    Description: "Public IP of the backend EC2 instance"
+    Value: !GetAtt BackendInstance.PublicIp
+  ALBEndpoint:
+    Description: "Application Load Balancer DNS Name"
+    Value: !GetAtt ALB.DNSName
+  CloudWatchLogGroup:
+    Description: "CloudWatch Log Group for Backend Logs"
+    Value: !Ref CloudWatchLogGroup
