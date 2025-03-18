@@ -288,3 +288,136 @@ router.put('/customers/:id', authenticateUser, (req, res) => {
         return res.status(200).json({ message: 'Customer updated successfully' });
     });
 });
+
+
+/**
+ * PUT APIs for edit orders, users, and technicians 
+ */
+
+/** 
+ *POST APIs (Creating New Records)
+*/
+router.post('/inventory', authenticateUser, (req, res) => {
+    const { itemName, itemDesc, itemQuantity } = req.body;
+
+    if (!itemName || !itemQuantity) {
+        return res.status(400).json({ message: 'Item name and quantity are required' });
+    }
+
+    const query = `
+        INSERT INTO Inventory (ItemName, Item_Desc, Item_Quantity) 
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [itemName, itemDesc || '', itemQuantity], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Inventory item added successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/customers - Add a new customer
+ */
+router.post('/customers', authenticateUser, (req, res) => {
+    const { firstName, lastName, address, phone } = req.body;
+
+    if (!firstName || !lastName || !address || !phone) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const query = `
+        INSERT INTO Customer (Customer_fName, Customer_lName, CustomerAddress, CustomerPhone)
+        VALUES (?, ?, ?, ?);
+    `;
+
+    pool.query(query, [firstName, lastName, address, phone], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Customer added successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/technicians - Add a new technician
+ */
+router.post('/technicians', authenticateUser, (req, res) => {
+    const { firstName, lastName, userID } = req.body;
+
+    if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First and last name are required' });
+    }
+
+    const query = `
+        INSERT INTO Technician (Tech_fName, Tech_lName, UserID)
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [firstName, lastName, userID || null], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Technician added successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/sales_reps - Add a new sales rep
+ */
+router.post('/sales_reps', authenticateUser, (req, res) => {
+    const { firstName, lastName, userID } = req.body;
+
+    if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First and last name are required' });
+    }
+
+    const query = `
+        INSERT INTO SalesRep (SalesRep_fName, SalesRep_lName, UserID)
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [firstName, lastName, userID || null], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Sales Rep added successfully', id: result.insertId });
+    });
+});
+
+
+/**
+ * POST /api/orders - Create a new order
+ */
+router.post('/orders', authenticateUser, (req, res) => {
+    const { customerID, techID, salesRepID } = req.body;
+
+    if (!customerID || !techID || !salesRepID) {
+        return res.status(400).json({ message: 'Customer ID, Technician ID, and Sales Rep ID are required' });
+    }
+
+    const query = `
+        INSERT INTO \`Order\` (CustomerID, TechID, SalesRepID)
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [customerID, techID, salesRepID], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Order created successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/orderitems - Add items to an order
+ */
+router.post('/orderitems', authenticateUser, (req, res) => {
+    const { skuNumber, orderID } = req.body;
+
+    if (!skuNumber || !orderID) {
+        return res.status(400).json({ message: 'SKU Number and Order ID are required' });
+    }
+
+    const query = `
+        INSERT INTO OrderItems (SKU_Number, OrderID)
+        VALUES (?, ?);
+    `;
+
+    pool.query(query, [skuNumber, orderID], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Order item added successfully' });
+    });
+});
+
