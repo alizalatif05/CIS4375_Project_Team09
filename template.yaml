@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: "2025-03-16"
+AWSTemplateFormatVersion: "2010-09-09"
 Description: CloudFormation template to manage resources for the client platform (without IAM resources, supporting frontend and backend deployment via GitHub)
 
 Parameters:
@@ -59,12 +59,20 @@ Resources:
       AvailabilityZone: !Select [1, !GetAZs ""]
       MapPublicIpOnLaunch: true
 
-  PrivateSubnet:
+  PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       CidrBlock: "10.0.3.0/24"
       VpcId: !Ref VPC
       AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: false
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: "10.0.4.0/24"
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [1, !GetAZs ""]
       MapPublicIpOnLaunch: false
 
   InternetGateway:
@@ -100,6 +108,17 @@ Resources:
           ToPort: 22
           CidrIp: "0.0.0.0/0"
 
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for MySQL RDS
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: "0.0.0.0/0"
+
   BackendInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -117,6 +136,31 @@ Resources:
           cd /home/ec2-user/app
           ./deploy.sh
 
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnet group for MySQL RDS"
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  MySQLDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "client-mysql-${Environment}"
+      AllocatedStorage: 20
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: MySQL
+      EngineVersion: "8.0"
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      MultiAZ: false
+      StorageType: gp2
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+
   ALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -131,7 +175,7 @@ Resources:
   S3FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "client-frontend-${Environment}"
+      BucketName: !Sub "client-frontend-${Environment}-${AWS::AccountId}"
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
@@ -141,20 +185,3 @@ Resources:
     Properties:
       LogGroupName: !Sub "BackendLogs-${Environment}"
       RetentionInDays: 7
-
-Outputs:
-  VPCId:
-    Description: "ID of the VPC"
-    Value: !Ref VPC
-  RDSEndpoint:
-    Description: "RDS MySQL Endpoint"
-    Value: !GetAtt MySQLDatabase.Endpoint.Address
-  BackendPublicIP:
-    Description: "Public IP of the backend EC2 instance"
-    Value: !GetAtt BackendInstance.PublicIp
-  ALBEndpoint:
-    Description: "Application Load Balancer DNS Name"
-    Value: !GetAtt ALB.DNSName
-  CloudWatchLogGroup:
-    Description: "CloudWatch Log Group for Backend Logs"
-    Value: !Ref CloudWatchLogGroup
