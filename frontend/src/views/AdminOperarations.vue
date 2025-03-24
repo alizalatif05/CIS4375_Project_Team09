@@ -2,32 +2,32 @@
 <template>
   <div class="admin-page">
     <h1>Admin Operations</h1>
-    
+
     <div class="connection-status" v-if="connectionStatus">
       <span :class="connectionStatusClass">{{ connectionStatusMessage }}</span>
     </div>
-    
+
     <div class="tabs">
-      <button 
-        :class="{ active: activeTab === 'technicians' }" 
+      <button
+        :class="{ active: activeTab === 'technicians' }"
         @click="activeTab = 'technicians'"
       >
         Technician Management
       </button>
-      <button 
-        :class="{ active: activeTab === 'salesreps' }" 
+      <button
+        :class="{ active: activeTab === 'salesreps' }"
         @click="activeTab = 'salesreps'"
       >
         Sales Representatives
       </button>
-      <button 
-        :class="{ active: activeTab === 'users' }" 
+      <button
+        :class="{ active: activeTab === 'users' }"
         @click="activeTab = 'users'"
       >
         User Management
       </button>
     </div>
-    
+
     <!-- Technicians Tab -->
     <div v-if="activeTab === 'technicians'" class="tab-content">
       <div class="actions">
@@ -35,7 +35,7 @@
           Add New Technician
         </button>
       </div>
-      
+
       <div class="data-table">
         <h2>Technicians</h2>
         <div v-if="loading.technicians" class="loading">Loading technicians...</div>
@@ -74,7 +74,7 @@
           </tbody>
         </table>
       </div>
-      
+
       <!-- Technician Form Modal -->
       <div v-if="showTechCreateForm || editingTech" class="modal">
         <div class="modal-content">
@@ -116,7 +116,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Technician Details Modal -->
       <div v-if="selectedTech" class="modal">
         <div class="modal-content">
@@ -137,7 +137,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Sales Reps Tab -->
     <div v-if="activeTab === 'salesreps'" class="tab-content">
       <div class="actions">
@@ -145,7 +145,7 @@
           Add New Sales Rep
         </button>
       </div>
-      
+
       <div class="data-table">
         <h2>Sales Representatives</h2>
         <div v-if="loading.salesReps" class="loading">Loading sales representatives...</div>
@@ -184,7 +184,7 @@
           </tbody>
         </table>
       </div>
-      
+
       <!-- Sales Rep Form Modal -->
       <div v-if="showRepCreateForm || editingRep" class="modal">
         <div class="modal-content">
@@ -226,7 +226,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Sales Rep Details Modal -->
       <div v-if="selectedRep" class="modal">
         <div class="modal-content">
@@ -247,7 +247,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Users Tab -->
     <div v-if="activeTab === 'users'" class="tab-content">
       <div class="actions">
@@ -255,7 +255,7 @@
           Add New User
         </button>
       </div>
-      
+
       <div class="data-table">
         <h2>Users</h2>
         <div v-if="loading.users" class="loading">Loading users...</div>
@@ -298,7 +298,7 @@
           </tbody>
         </table>
       </div>
-      
+
       <!-- User Form Modal -->
       <div v-if="showUserCreateForm || editingUser" class="modal">
         <div class="modal-content">
@@ -352,7 +352,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- User Details Modal -->
       <div v-if="selectedUser" class="modal">
         <div class="modal-content">
@@ -379,6 +379,7 @@
 </template>
 
 <script>
+import "@/assets/css/style.css";
 import api from '../../../backend/services/api.js';
 
 export default {
@@ -386,7 +387,7 @@ export default {
     return {
       activeTab: 'technicians',
       connectionStatus: null,
-      
+
       // Loading and error states
       loading: {
         technicians: false,
@@ -398,7 +399,7 @@ export default {
         salesReps: null,
         users: null
       },
-      
+
       // Technician data
       technicians: [],
       selectedTech: null,
@@ -410,7 +411,7 @@ export default {
         UserID: '',
         Deleted: 'No'
       },
-      
+
       // Sales rep data
       salesReps: [],
       selectedRep: null,
@@ -422,7 +423,7 @@ export default {
         UserID: '',
         Deleted: 'No'
       },
-      
+
       // User data
       users: [],
       selectedUser: null,
@@ -467,7 +468,7 @@ export default {
       try {
         const result = await api.testConnection();
         this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
-        
+
         // Auto-hide success message after 3 seconds
         if (this.connectionStatus === 'connected') {
           setTimeout(() => {
@@ -479,19 +480,19 @@ export default {
         console.error('API connection test failed:', error);
       }
     },
-    
+
     // Load all data
     loadData() {
       this.loadUsers();
       this.loadTechnicians();
       this.loadSalesReps();
     },
-    
+
     // User data methods
     async loadUsers() {
       this.loading.users = true;
       this.error.users = null;
-      
+
       try {
         this.users = await api.getUsers();
       } catch (error) {
@@ -501,11 +502,11 @@ export default {
         this.loading.users = false;
       }
     },
-    
+
     viewUserDetails(user) {
       this.selectedUser = user;
     },
-    
+
     editUser(user) {
       this.editingUser = user;
       // Create a copy of the user data for editing
@@ -513,11 +514,11 @@ export default {
       // Don't include password for editing
       delete userCopy.UserPassword;
       this.userForm = userCopy;
-      
+
       // If a user was being viewed, close the view modal
       this.selectedUser = null;
     },
-    
+
     async saveUser() {
       try {
         if (this.editingUser) {
@@ -525,25 +526,25 @@ export default {
           if (!this.userForm.UserPassword) {
             delete this.userForm.UserPassword;
           }
-          
+
           await api.updateUser(this.editingUser.UserID, this.userForm);
-          
+
           // Refresh the users list
           await this.loadUsers();
         } else {
           await api.createUser(this.userForm);
-          
+
           // Refresh the users list
           await this.loadUsers();
         }
-        
+
         this.cancelUserForm();
       } catch (error) {
         console.error('Error saving user:', error);
         alert(`Error saving user: ${error.message}`);
       }
     },
-    
+
     cancelUserForm() {
       this.editingUser = null;
       this.showUserCreateForm = false;
@@ -556,12 +557,12 @@ export default {
         Deleted: 'no'
       };
     },
-    
+
     // Technician data methods
     async loadTechnicians() {
       this.loading.technicians = true;
       this.error.technicians = null;
-      
+
       try {
         this.technicians = await api.getTechnicians();
       } catch (error) {
@@ -571,19 +572,19 @@ export default {
         this.loading.technicians = false;
       }
     },
-    
+
     viewTechnicianDetails(tech) {
       this.selectedTech = tech;
     },
-    
+
     editTechnician(tech) {
       this.editingTech = tech;
       this.techForm = { ...tech };
-      
+
       // If a technician was being viewed, close the view modal
       this.selectedTech = null;
     },
-    
+
     async saveTechnician() {
       try {
         if (this.editingTech) {
@@ -591,7 +592,7 @@ export default {
         } else {
           await api.createTechnician(this.techForm);
         }
-        
+
         // Refresh the technicians list
         await this.loadTechnicians();
         this.cancelTechForm();
@@ -600,7 +601,7 @@ export default {
         alert(`Error saving technician: ${error.message}`);
       }
     },
-    
+
     cancelTechForm() {
       this.editingTech = null;
       this.showTechCreateForm = false;
@@ -611,12 +612,12 @@ export default {
         Deleted: 'No'
       };
     },
-    
+
     // Sales rep data methods
     async loadSalesReps() {
       this.loading.salesReps = true;
       this.error.salesReps = null;
-      
+
       try {
         this.salesReps = await api.getSalesReps();
       } catch (error) {
@@ -626,19 +627,19 @@ export default {
         this.loading.salesReps = false;
       }
     },
-    
+
     viewSalesRepDetails(rep) {
       this.selectedRep = rep;
     },
-    
+
     editSalesRep(rep) {
       this.editingRep = rep;
       this.repForm = { ...rep };
-      
+
       // If a sales rep was being viewed, close the view modal
       this.selectedRep = null;
     },
-    
+
     async saveSalesRep() {
       try {
         if (this.editingRep) {
@@ -646,7 +647,7 @@ export default {
         } else {
           await api.createSalesRep(this.repForm);
         }
-        
+
         // Refresh the sales reps list
         await this.loadSalesReps();
         this.cancelRepForm();
@@ -655,7 +656,7 @@ export default {
         alert(`Error saving sales representative: ${error.message}`);
       }
     },
-    
+
     cancelRepForm() {
       this.editingRep = null;
       this.showRepCreateForm = false;
@@ -669,267 +670,3 @@ export default {
   }
 }
 </script>
-
-<style scoped>
-.admin-page {
-  padding: 1rem;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-h1 {
-  margin-bottom: 0.5rem;
-  color: #2c3e50;
-}
-
-/* Connection status styles */
-.connection-status {
-  margin-bottom: 1rem;
-  padding: 0.5rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  display: inline-block;
-}
-
-.status-connected {
-  background-color: #e6f7f0;
-  color: #42b983;
-}
-
-.status-error {
-  background-color: #ffebee;
-  color: #f44336;
-}
-
-/* Error message */
-.error-message {
-  color: #f44336;
-  background-color: #ffebee;
-  padding: 0.75rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-/* Tab styles */
-.tabs {
-  display: flex;
-  border-bottom: 1px solid #ddd;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.tabs button {
-  padding: 0.75rem 1.5rem;
-  background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.tabs button.active {
-  border-bottom: 3px solid #42b983;
-  font-weight: bold;
-  color: #42b983;
-}
-
-.tab-content {
-  margin-top: 1rem;
-}
-
-/* Action buttons */
-.actions {
-  margin-bottom: 1rem;
-}
-
-.create-btn {
-  padding: 0.5rem 1rem;
-  background-color: #42b983;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.create-btn:hover {
-  background-color: #3aa876;
-}
-
-/* Table styles */
-.data-table {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 1rem;
-  margin-bottom: 2rem;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-th {
-  font-weight: bold;
-  color: #2c3e50;
-  background-color: #f8f8f8;
-}
-
-tbody tr:hover {
-  background-color: #f9f9f9;
-}
-
-/* Status badges */
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.active {
-  background-color: #e6f7f0;
-  color: #42b983;
-}
-
-.inactive {
-  background-color: #f2f2f2;
-  color: #888;
-}
-
-/* Button styles */
-.btn-view, .btn-edit {
-  padding: 0.25rem 0.5rem;
-  margin-right: 0.5rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-.btn-view {
-  background-color: #e9f2fd;
-  color: #428bca;
-}
-
-.btn-edit {
-  background-color: #fcf5e9;
-  color: #f0ad4e;
-}
-
-.btn-save {
-  background-color: #42b983;
-  color: white;
-}
-
-.btn-cancel {
-  background-color: #f2f2f2;
-  color: #666;
-}
-
-/* Modal styles */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 100;
-}
-
-.modal-content {
-  background-color: white;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.modal-header {
-  padding: 1rem;
-  border-bottom: 1px solid #eee;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: #2c3e50;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #666;
-}
-
-.modal-body {
-  padding: 1rem;
-}
-
-/* Form styles */
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1.5rem;
-}
-
-.form-actions button {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-/* Details section styles */
-.details-section {
-  margin-bottom: 1.5rem;
-}
-
-/* Loading indicator */
-.loading {
-  padding: 2rem;
-  text-align: center;
-  color: #666;
-}
-</style>
