@@ -252,7 +252,7 @@ router.put('/inventory/:id', authenticateUser, (req, res) => {
     const updateQuery = `
         UPDATE Inventory
         SET name = ?, quantity = ?, location = ?, category = ?
-        WHERE inventory_id = ?;
+        WHERE SKU_Number = ?;
     `;
 
     // Execute the update query
@@ -311,3 +311,258 @@ router.put('/customers/:id', authenticateUser, (req, res) => {
         return res.status(200).json({ message: 'Customer updated successfully' });
     });
 });
+
+
+/**
+ * PUT APIs PUT /api/orders/:id - Update an existing order 
+ */
+router.put('/orders/:id', authenticateUser, (req, res) => {
+    const orderId = req.params.id;
+    const { customerID, techID, salesRepID } = req.body;
+
+    if (!customerID || !techID || !salesRepID) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const query = `
+        UPDATE \`Order\`
+        SET CustomerID = ?, TechID = ?, SalesRepID = ?
+        WHERE OrderID = ?;
+    `;
+
+    pool.query(query, [customerID, techID, salesRepID, orderId], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        res.json({ message: 'Order updated successfully' });
+    });
+});
+
+/**
+ * PUT /api/users/:id - Update a user's information
+ */
+router.put('/users/:id', authenticateUser, (req, res) => {
+    const userId = req.params.id;
+    const { User_fName, User_lName, Username, UserPassword, UserType } = req.body;
+
+    if (!User_fName || !User_lName || !Username || !UserPassword || !UserType) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const query = `
+        UPDATE User
+        SET User_fName = ?, User_lName = ?, Username = ?, UserPassword = ?, UserType = ?
+        WHERE UserID = ?;
+    `;
+
+    pool.query(query, [User_fName, User_lName, Username, UserPassword, UserType, userId], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'User updated successfully' });
+    });
+});
+
+/**
+ * PUT /api/technicians/:id - Update a technician
+ */
+router.put('/technicians/:id', authenticateUser, (req, res) => {
+    const techId = req.params.id;
+    const { Tech_fName, Tech_lName, UserID } = req.body;
+
+    if (!Tech_fName || !Tech_lName) {
+        return res.status(400).json({ message: 'First and last name are required' });
+    }
+
+    const query = `
+        UPDATE Technician
+        SET Tech_fName = ?, Tech_lName = ?, UserID = ?
+        WHERE TechID = ?;
+    `;
+
+    pool.query(query, [Tech_fName, Tech_lName, UserID || null, techId], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Technician not found' });
+        }
+
+        res.json({ message: 'Technician updated successfully' });
+    });
+});
+
+/** 
+ *POST APIs (Creating New Records)
+*/
+router.post('/inventory', authenticateUser, (req, res) => {
+    const { itemName, itemDesc, itemQuantity } = req.body;
+
+    if (!itemName || !itemQuantity) {
+        return res.status(400).json({ message: 'Item name and quantity are required' });
+    }
+
+    const query = `
+        INSERT INTO Inventory (ItemName, Item_Desc, Item_Quantity) 
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [itemName, itemDesc || '', itemQuantity], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Inventory item added successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/customers - Add a new customer
+ */
+router.post('/customers', authenticateUser, (req, res) => {
+    const { firstName, lastName, address, phone } = req.body;
+
+    if (!firstName || !lastName || !address || !phone) {
+        return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    const query = `
+        INSERT INTO Customer (Customer_fName, Customer_lName, CustomerAddress, CustomerPhone)
+        VALUES (?, ?, ?, ?);
+    `;
+
+    pool.query(query, [firstName, lastName, address, phone], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Customer added successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/technicians - Add a new technician
+ */
+router.post('/technicians', authenticateUser, (req, res) => {
+    const { firstName, lastName, userID } = req.body;
+
+    if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First and last name are required' });
+    }
+
+    const query = `
+        INSERT INTO Technician (Tech_fName, Tech_lName, UserID)
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [firstName, lastName, userID || null], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Technician added successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/sales_reps - Add a new sales rep
+ */
+router.post('/sales_reps', authenticateUser, (req, res) => {
+    const { firstName, lastName, userID } = req.body;
+
+    if (!firstName || !lastName) {
+        return res.status(400).json({ message: 'First and last name are required' });
+    }
+
+    const query = `
+        INSERT INTO SalesRep (SalesRep_fName, SalesRep_lName, UserID)
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [firstName, lastName, userID || null], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Sales Rep added successfully', id: result.insertId });
+    });
+});
+
+
+/**
+ * POST /api/orders - Create a new order
+ */
+router.post('/orders', authenticateUser, (req, res) => {
+    const { customerID, techID, salesRepID } = req.body;
+
+    if (!customerID || !techID || !salesRepID) {
+        return res.status(400).json({ message: 'Customer ID, Technician ID, and Sales Rep ID are required' });
+    }
+
+    const query = `
+        INSERT INTO \`Order\` (CustomerID, TechID, SalesRepID)
+        VALUES (?, ?, ?);
+    `;
+
+    pool.query(query, [customerID, techID, salesRepID], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Order created successfully', id: result.insertId });
+    });
+});
+
+/**
+ * POST /api/orderitems - Add items to an order
+ */
+router.post('/orderitems', authenticateUser, (req, res) => {
+    const { skuNumber, orderID } = req.body;
+
+    if (!skuNumber || !orderID) {
+        return res.status(400).json({ message: 'SKU Number and Order ID are required' });
+    }
+
+    const query = `
+        INSERT INTO OrderItems (SKU_Number, OrderID)
+        VALUES (?, ?);
+    `;
+
+    pool.query(query, [skuNumber, orderID], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.status(201).json({ message: 'Order item added successfully' });
+    });
+});
+
+/**
+ * DELETE API (soft delete)
+ */
+router.delete('/inventory/:id', authenticateUser, (req, res) => {
+    const inventoryId = req.params.id;
+
+    const query = `
+        UPDATE Inventory SET Deleted = 'Yes' WHERE SKU_Number = ?;
+    `;
+
+    pool.query(query, [inventoryId], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.json({ message: 'Inventory item soft deleted' });
+    });
+});
+
+
+
+
+/**
+ * GET /api/order/:id/details - retrieving full order details
+ */
+router.get('/orders/:id/details', authenticateUser, (req, res) => {
+    const query = `
+        SELECT o.OrderID, c.Customer_fName AS CustomerName, t.Tech_fName AS TechnicianName,
+               sr.SalesRep_fName AS SalesRepName, i.ItemName
+        FROM \`Order\` o
+        JOIN Customer c ON o.CustomerID = c.CustomerID
+        JOIN Technician t ON o.TechID = t.TechID
+        JOIN SalesRep sr ON o.SalesRepID = sr.SalesRepID
+        JOIN OrderItems oi ON o.OrderID = oi.OrderID
+        JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
+        WHERE o.OrderID = ?;
+    `;
+
+    pool.query(query, [req.params.id], (err, results) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.json(results);
+    });
+});
+
+module.exports = router;
