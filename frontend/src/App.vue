@@ -1,19 +1,14 @@
 <template>
   <header>
-    <h1>{{ companyName }}</h1>
+    <img src="@/assets/Militia Protection Logo.png">
   </header>
 
   <nav>
     <router-link to="/">Home</router-link> |
     <router-link to="/inventory">Inventory</router-link> |
     <router-link to="/customers">Customers</router-link> |
-    <router-link to="/technicians">Technicians</router-link> |
     <router-link to="/orders">Orders</router-link> |
-    <router-link to="/users">Users</router-link> |
     <router-link to="/admins">Admins</router-link> |
-    <router-link to="/order-items">Order Items</router-link> |
-    <router-link to="/sales-reps">Sales Representatives</router-link> |
-    <router-link to="/tech-inventory">Tech Inventory</router-link>
   </nav>
 
   <main>
@@ -21,15 +16,7 @@
   </main>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      companyName: "Militia Protection" 
-    };
-  }
-};
-</script>
+
 
 <style scoped>
 header {

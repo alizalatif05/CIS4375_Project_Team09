@@ -6,6 +6,20 @@ const dotenv = require('dotenv'); // Environment variable management
 
 dotenv.config(); // Load environment variables from .env file
 
+// test user for development only
+const authenticateUser = (req, res, next) => {
+    req.user = {
+        id: 1,
+        username: 'test_user',
+        isAdmin: true,
+        role: 'admin'
+    };
+
+console.log('This is a test user, please replace before deployment.')
+
+next();
+};
+
 /**
  * Middleware function to authenticate users via JWT.
  *
@@ -17,20 +31,22 @@ dotenv.config(); // Load environment variables from .env file
  * @param {Object} res - The response object.
  * @param {Function} next - Callback function to pass control to the next middleware.
  */
-const authenticateUser = (req, res, next) => {
-    const token = req.header('Authorization'); // Get token from request header
-    if (!token) {
-        return res.status(401).json({ message: 'Access denied. No token provided.' }); // If no token, deny access
-    }
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify the token using the secret key
-        req.user = decoded; // Attach decoded user data to request
-        next(); // Move to the next middleware or route handler
-    } catch (err) {
-        res.status(400).json({ message: 'Invalid token' }); // If token is invalid, return error response
-    }
-};
+// ACUTAL AUTH LOGIC BELOW
+// const authenticateUser = (req, res, next) => {
+//     const token = req.header('Authorization'); // Get token from request header
+//     if (!token) {
+//         return res.status(401).json({ message: 'Access denied. No token provided.' }); // If no token, deny access
+//     }
+
+//     try {
+//         const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify the token using the secret key
+//         req.user = decoded; // Attach decoded user data to request
+//         next(); // Move to the next middleware or route handler
+//     } catch (err) {
+//         res.status(400).json({ message: 'Invalid token' }); // If token is invalid, return error response
+//     }
+// };
 
 /**
  * Middleware function to authorize admin users only.
@@ -42,11 +58,21 @@ const authenticateUser = (req, res, next) => {
  * @param {Object} res - The response object.
  * @param {Function} next - Callback function to pass control to the next middleware.
  */
+
+//Test auth
+
 const authorizeAdmin = (req, res, next) => {
-    if (!req.user.isAdmin) {
-        return res.status(403).json({ message: 'Access denied. Admins only.' }); // If not admin, deny access
-    }
-    next(); // Allow admin to proceed
+    console.log('Authorization in test mode.')
+    next();
 };
+
+
+//ACTUAL LOGIC BELOW
+// const authorizeAdmin = (req, res, next) => {
+//     if (!req.user.isAdmin) {
+//         return res.status(403).json({ message: 'Access denied. Admins only.' }); // If not admin, deny access
+//     }
+//     next(); // Allow admin to proceed
+// };
 
 module.exports = { authenticateUser, authorizeAdmin }; // Export both middleware functions
