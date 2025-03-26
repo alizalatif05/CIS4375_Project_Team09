@@ -38,23 +38,28 @@
         <table v-else>
           <thead>
             <tr>
-              <th>SKU/ID</th>
+              <th>SKU Number</th>
               <th>Item Name</th>
-              <th>Item Quantity</th>
+              <th>Description</th>
+              <th>Quantity</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in inventory" :key="item.SKU">
-              <td>{{ item.SKU }}</td>
+            <tr v-for="item in inventory" :key="item.SKU_Number">
+              <td>{{ item.SKU_Number }}</td>
               <td>{{ item.ItemName }}</td>
-              <td>{{ item.ItemQuantity }}</td>
+              <td>{{ item.Item_Desc }}</td>
+              <td>{{ item.Item_Quantity }}</td>
               <td>
                 <button @click="viewInventoryDetails(item)" class="btn-view">
                   View
                 </button>
                 <button @click="editInventory(item)" class="btn-edit">
                   Edit
+                </button>
+                <button @click="deleteInventory(item.SKU_Number)" class="btn-delete">
+                  Delete
                 </button>
               </td>
             </tr>
@@ -72,16 +77,16 @@
           <div class="modal-body">
             <form @submit.prevent="saveInventory">
               <div class="form-group">
-                <label>SKU/ID:</label>
-                <input v-model="inventoryForm.SKU" required />
-              </div>
-              <div class="form-group">
                 <label>Item Name:</label>
-                <input v-model="inventoryForm.ItemName" required />
+                <input v-model="inventoryForm.ItemName" type="text" required />
               </div>
               <div class="form-group">
-                <label>Item Quantity:</label>
-                <input type="number" v-model="inventoryForm.ItemQuantity" required />
+                <label>Description:</label>
+                <input v-model="inventoryForm.Item_Desc" type="text" />
+              </div>
+              <div class="form-group">
+                <label>Quantity:</label>
+                <input v-model="inventoryForm.Item_Quantity" type="number" required />
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn-save">Save</button>
@@ -101,12 +106,14 @@
           </div>
           <div class="modal-body">
             <div class="details-section">
-              <p><strong>SKU/ID:</strong> {{ selectedInventory.SKU }}</p>
+              <p><strong>SKU Number:</strong> {{ selectedInventory.SKU_Number }}</p>
               <p><strong>Item Name:</strong> {{ selectedInventory.ItemName }}</p>
-              <p><strong>Item Quantity:</strong> {{ selectedInventory.ItemQuantity }}</p>
+              <p><strong>Description:</strong> {{ selectedInventory.Item_Desc }}</p>
+              <p><strong>Quantity:</strong> {{ selectedInventory.Item_Quantity }}</p>
             </div>
             <div class="form-actions">
               <button @click="editInventory(selectedInventory)" class="btn-edit">Edit</button>
+              <button @click="selectedInventory = null" class="btn-cancel">Close</button>
             </div>
           </div>
         </div>
@@ -117,7 +124,7 @@
     <div v-if="activeTab === 'technicianInventory'" class="tab-content">
       <div class="actions">
         <button @click="showTechInventoryCreateForm = true" class="create-btn">
-          Add New Technician Inventory
+          Assign Item to Technician
         </button>
       </div>
 
@@ -130,21 +137,25 @@
         <table v-else>
           <thead>
             <tr>
-              <th>Item SKU</th>
+              <th>SKU Number</th>
               <th>Technician ID</th>
+              <th>Item Name</th>
+              <th>Description</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="techItem in technicianInventory" :key="techItem.SKU + '-' + techItem.TechID">
-              <td>{{ techItem.SKU }}</td>
+            <tr v-for="techItem in technicianInventory" :key="`${techItem.SKU_Number}-${techItem.TechID}`">
+              <td>{{ techItem.SKU_Number }}</td>
               <td>{{ techItem.TechID }}</td>
+              <td>{{ techItem.ItemName }}</td>
+              <td>{{ techItem.Item_Desc }}</td>
               <td>
                 <button @click="viewTechInventoryDetails(techItem)" class="btn-view">
                   View
                 </button>
-                <button @click="editTechInventory(techItem)" class="btn-edit">
-                  Edit
+                <button @click="deleteTechInventory(techItem.SKU_Number, techItem.TechID)" class="btn-delete">
+                  Remove
                 </button>
               </td>
             </tr>
@@ -153,46 +164,37 @@
       </div>
 
       <!-- Technician Inventory Form Modal -->
-      <div v-if="showTechInventoryCreateForm || editingTechInventory" class="modal">
+      <div v-if="showTechInventoryCreateForm" class="modal">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>{{ editingTechInventory ? 'Edit Technician Inventory' : 'Add New Technician Inventory' }}</h3>
+            <h3>Assign Item to Technician</h3>
             <button @click="cancelTechInventoryForm" class="close-btn">&times;</button>
           </div>
           <div class="modal-body">
             <form @submit.prevent="saveTechInventory">
               <div class="form-group">
-                <label>Item SKU:</label>
-                <input v-model="techInventoryForm.SKU" required />
+                <label>Item:</label>
+                <select v-model="techInventoryForm.SKU_Number" required>
+                  <option value="">Select an item</option>
+                  <option v-for="item in inventory" :key="item.SKU_Number" :value="item.SKU_Number">
+                    {{ item.ItemName }} ({{ item.SKU_Number }})
+                  </option>
+                </select>
               </div>
               <div class="form-group">
-                <label>Technician ID:</label>
-                <input v-model="techInventoryForm.TechID" required />
+                <label>Technician:</label>
+                <select v-model="techInventoryForm.TechID" required>
+                  <option value="">Select a technician</option>
+                  <option v-for="tech in technicians" :key="tech.TechID" :value="tech.TechID">
+                    {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
+                  </option>
+                </select>
               </div>
               <div class="form-actions">
-                <button type="submit" class="btn-save">Save</button>
+                <button type="submit" class="btn-save">Assign</button>
                 <button type="button" @click="cancelTechInventoryForm" class="btn-cancel">Cancel</button>
               </div>
             </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- Technician Inventory Details Modal -->
-      <div v-if="selectedTechInventory" class="modal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Technician Inventory Details</h3>
-            <button @click="selectedTechInventory = null" class="close-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div class="details-section">
-              <p><strong>Item SKU:</strong> {{ selectedTechInventory.SKU }}</p>
-              <p><strong>Technician ID:</strong> {{ selectedTechInventory.TechID }}</p>
-            </div>
-            <div class="form-actions">
-              <button @click="editTechInventory(selectedTechInventory)" class="btn-edit">Edit</button>
-            </div>
           </div>
         </div>
       </div>
@@ -213,34 +215,37 @@ export default {
       // Loading and error states
       loading: {
         inventory: false,
-        technicianInventory: false
+        technicianInventory: false,
+        technicians: false
       },
       error: {
         inventory: null,
-        technicianInventory: null
+        technicianInventory: null,
+        technicians: null
       },
 
-      // Inventory data
+      // Data
       inventory: [],
+      technicianInventory: [],
+      technicians: [],
+
+      // UI State
       selectedInventory: null,
       editingInventory: null,
       showInventoryCreateForm: false,
-      inventoryForm: {
-        SKU: '',
-        ItemName: '',
-        ItemQuantity: 0
-      },
-
-      // Technician Inventory data
-      technicianInventory: [],
-      selectedTechInventory: null,
-      editingTechInventory: null,
       showTechInventoryCreateForm: false,
+
+      // Forms
+      inventoryForm: {
+        ItemName: '',
+        Item_Desc: '',
+        Item_Quantity: 0
+      },
       techInventoryForm: {
-        SKU: '',
+        SKU_Number: '',
         TechID: ''
       }
-    }
+    };
   },
   computed: {
     connectionStatusClass() {
@@ -248,7 +253,7 @@ export default {
       return this.connectionStatus === 'connected' ? 'status-connected' : 'status-error';
     },
     connectionStatusMessage() {
-      switch(this.connectionStatus) {
+      switch (this.connectionStatus) {
         case 'connected':
           return 'API Connected';
         case 'error':
@@ -269,7 +274,6 @@ export default {
         const result = await api.testConnection();
         this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
 
-        // Auto-hide success message after 3 seconds
         if (this.connectionStatus === 'connected') {
           setTimeout(() => {
             this.connectionStatus = null;
@@ -282,16 +286,16 @@ export default {
     },
 
     // Load all data
-    loadData() {
-      this.loadInventory();
-      this.loadTechnicianInventory();
+    async loadData() {
+      await this.loadInventory();
+      await this.loadTechnicianInventory();
+      await this.loadTechnicians();
     },
 
-    // Inventory data methods
+    // Inventory methods
     async loadInventory() {
       this.loading.inventory = true;
       this.error.inventory = null;
-
       try {
         this.inventory = await api.getInventory();
       } catch (error) {
@@ -308,21 +312,36 @@ export default {
 
     editInventory(item) {
       this.editingInventory = item;
-      this.inventoryForm = { ...item };
-
-      // If an inventory item was being viewed, close the view modal
-      this.selectedInventory = null;
+      this.inventoryForm = {
+        ItemName: item.ItemName,
+        Item_Desc: item.Item_Desc,
+        Item_Quantity: item.Item_Quantity
+      };
+      this.showInventoryCreateForm = true;
     },
 
     async saveInventory() {
       try {
         if (this.editingInventory) {
-          await api.updateInventory(this.editingInventory.SKU, this.inventoryForm);
+          await api.fetchData(`/inventory/${this.editingInventory.SKU_Number}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              name: this.inventoryForm.ItemName,
+              quantity: this.inventoryForm.Item_Quantity,
+              location: '', // These fields may need to be adjusted based on your actual DB schema
+              category: this.inventoryForm.Item_Desc
+            })
+          });
         } else {
-          await api.createInventory(this.inventoryForm);
+          await api.fetchData('/inventory', {
+            method: 'POST',
+            body: JSON.stringify({
+              itemName: this.inventoryForm.ItemName,
+              itemDesc: this.inventoryForm.Item_Desc,
+              itemQuantity: this.inventoryForm.Item_Quantity
+            })
+          });
         }
-
-        // Refresh the inventory list
         await this.loadInventory();
         this.cancelInventoryForm();
       } catch (error) {
@@ -331,23 +350,36 @@ export default {
       }
     },
 
+    async deleteInventory(sku) {
+      if (confirm('Are you sure you want to delete this inventory item?')) {
+        try {
+          await api.fetchData(`/inventory/${sku}`, {
+            method: 'DELETE'
+          });
+          await this.loadInventory();
+        } catch (error) {
+          console.error('Error deleting inventory:', error);
+          alert(`Error deleting inventory: ${error.message}`);
+        }
+      }
+    },
+
     cancelInventoryForm() {
       this.editingInventory = null;
       this.showInventoryCreateForm = false;
       this.inventoryForm = {
-        SKU: '',
         ItemName: '',
-        ItemQuantity: 0
+        Item_Desc: '',
+        Item_Quantity: 0
       };
     },
 
-    // Technician Inventory data methods
+    // Technician Inventory methods
     async loadTechnicianInventory() {
       this.loading.technicianInventory = true;
       this.error.technicianInventory = null;
-
       try {
-        this.technicianInventory = await api.getTechnicianInventory();
+        this.technicianInventory = await api.fetchData('/techinventory');
       } catch (error) {
         console.error('Error loading technician inventory:', error);
         this.error.technicianInventory = `Failed to load technician inventory: ${error.message}`;
@@ -356,43 +388,63 @@ export default {
       }
     },
 
-    viewTechInventoryDetails(techItem) {
-      this.selectedTechInventory = techItem;
+    async loadTechnicians() {
+      this.loading.technicians = true;
+      this.error.technicians = null;
+      try {
+        this.technicians = await api.getTechnicians();
+      } catch (error) {
+        console.error('Error loading technicians:', error);
+        this.error.technicians = `Failed to load technicians: ${error.message}`;
+      } finally {
+        this.loading.technicians = false;
+      }
     },
 
-    editTechInventory(techItem) {
-      this.editingTechInventory = techItem;
-      this.techInventoryForm = { ...techItem };
-
-      // If a technician inventory item was being viewed, close the view modal
-      this.selectedTechInventory = null;
+    viewTechInventoryDetails(techItem) {
+      // You can implement a detailed view if needed
+      alert(`Viewing assignment: ${techItem.SKU_Number} to Tech ${techItem.TechID}`);
     },
 
     async saveTechInventory() {
       try {
-        if (this.editingTechInventory) {
-          await api.updateTechnicianInventory(this.editingTechInventory.SKU, this.techInventoryForm);
-        } else {
-          await api.createTechnicianInventory(this.techInventoryForm);
-        }
-
-        // Refresh the technician inventory list
+        await api.fetchData('/techinventory', {
+          method: 'POST',
+          body: JSON.stringify({
+            SKU_Number: this.techInventoryForm.SKU_Number,
+            TechID: this.techInventoryForm.TechID
+          })
+        });
         await this.loadTechnicianInventory();
         this.cancelTechInventoryForm();
       } catch (error) {
-        console.error('Error saving technician inventory:', error);
-        alert(`Error saving technician inventory: ${error.message}`);
+        console.error('Error assigning item to technician:', error);
+        alert(`Error assigning item: ${error.message}`);
+      }
+    },
+
+    async deleteTechInventory(sku, techId) {
+      if (confirm('Are you sure you want to remove this assignment?')) {
+        try {
+          // Note: You'll need to implement this endpoint in your backend
+          await api.fetchData(`/techinventory/${sku}/${techId}`, {
+            method: 'DELETE'
+          });
+          await this.loadTechnicianInventory();
+        } catch (error) {
+          console.error('Error removing assignment:', error);
+          alert(`Error removing assignment: ${error.message}`);
+        }
       }
     },
 
     cancelTechInventoryForm() {
-      this.editingTechInventory = null;
       this.showTechInventoryCreateForm = false;
       this.techInventoryForm = {
-        SKU: '',
+        SKU_Number: '',
         TechID: ''
       };
     }
   }
-}
+};
 </script>

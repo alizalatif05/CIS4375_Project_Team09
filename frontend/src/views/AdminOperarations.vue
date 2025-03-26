@@ -1,4 +1,3 @@
-<!-- views/AdminOperationsPage.vue -->
 <template>
   <div class="admin-page">
     <h1>Admin Operations</h1>
@@ -48,6 +47,7 @@
               <th>ID</th>
               <th>First Name</th>
               <th>Last Name</th>
+              <th>User ID</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -55,8 +55,9 @@
           <tbody>
             <tr v-for="tech in technicians" :key="tech.TechID">
               <td>{{ tech.TechID }}</td>
-              <td>{{ tech.Tech_fName }}</td>
-              <td>{{ tech.Tech_lName }}</td>
+              <td>{{ tech.firstName }}</td>
+              <td>{{ tech.lastName }}</td>
+              <td>{{ tech.UserID }}</td>
               <td>
                 <span :class="['status-badge', tech.Deleted === 'No' ? 'active' : 'inactive']">
                   {{ tech.Deleted === 'No' ? 'Active' : 'Inactive' }}
@@ -68,6 +69,9 @@
                 </button>
                 <button @click="editTechnician(tech)" class="btn-edit">
                   Edit
+                </button>
+                <button @click="deleteTechnician(tech.TechID)" class="btn-delete">
+                  Delete
                 </button>
               </td>
             </tr>
@@ -86,18 +90,18 @@
             <form @submit.prevent="saveTechnician">
               <div class="form-group">
                 <label>First Name:</label>
-                <input v-model="techForm.Tech_fName" required />
+                <input v-model="techForm.firstName" type="text" required />
               </div>
               <div class="form-group">
                 <label>Last Name:</label>
-                <input v-model="techForm.Tech_lName" required />
+                <input v-model="techForm.lastName" type="text" required />
               </div>
               <div class="form-group">
                 <label>User:</label>
-                <select v-model="techForm.UserID" required>
+                <select v-model="techForm.UserID">
                   <option value="">Select a User</option>
                   <option v-for="user in availableUsers" :key="user.UserID" :value="user.UserID">
-                    {{ user.User_fName }} {{ user.User_lName }} ({{ user.Username }})
+                    {{ user.User_fName }} {{ user.User_lName }}
                   </option>
                 </select>
               </div>
@@ -116,26 +120,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Technician Details Modal -->
-      <div v-if="selectedTech" class="modal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Technician Details</h3>
-            <button @click="selectedTech = null" class="close-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div class="details-section">
-              <p><strong>ID:</strong> {{ selectedTech.TechID }}</p>
-              <p><strong>Name:</strong> {{ selectedTech.Tech_fName }} {{ selectedTech.Tech_lName }}</p>
-              <p><strong>Status:</strong> {{ selectedTech.Deleted === 'No' ? 'Active' : 'Inactive' }}</p>
-            </div>
-            <div class="form-actions">
-              <button @click="editTechnician(selectedTech)" class="btn-edit">Edit</button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Sales Reps Tab -->
@@ -148,7 +132,7 @@
 
       <div class="data-table">
         <h2>Sales Representatives</h2>
-        <div v-if="loading.salesReps" class="loading">Loading sales representatives...</div>
+        <div v-if="loading.salesReps" class="loading">Loading sales reps...</div>
         <div v-else-if="error.salesReps" class="error-message">
           {{ error.salesReps }}
         </div>
@@ -158,7 +142,7 @@
               <th>ID</th>
               <th>First Name</th>
               <th>Last Name</th>
-              <th>Status</th>
+              <th>User ID</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -167,17 +151,16 @@
               <td>{{ rep.SalesRepID }}</td>
               <td>{{ rep.SalesRep_fName }}</td>
               <td>{{ rep.SalesRep_lName }}</td>
-              <td>
-                <span :class="['status-badge', rep.Deleted === 'No' ? 'active' : 'inactive']">
-                  {{ rep.Deleted === 'No' ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
+              <td>{{ rep.UserID }}</td>
               <td>
                 <button @click="viewSalesRepDetails(rep)" class="btn-view">
                   View
                 </button>
                 <button @click="editSalesRep(rep)" class="btn-edit">
                   Edit
+                </button>
+                <button @click="deleteSalesRep(rep.SalesRepID)" class="btn-delete">
+                  Delete
                 </button>
               </td>
             </tr>
@@ -196,26 +179,19 @@
             <form @submit.prevent="saveSalesRep">
               <div class="form-group">
                 <label>First Name:</label>
-                <input v-model="repForm.SalesRep_fName" required />
+                <input v-model="repForm.SalesRep_fName" type="text" required />
               </div>
               <div class="form-group">
                 <label>Last Name:</label>
-                <input v-model="repForm.SalesRep_lName" required />
+                <input v-model="repForm.SalesRep_lName" type="text" required />
               </div>
               <div class="form-group">
                 <label>User:</label>
-                <select v-model="repForm.UserID" required>
+                <select v-model="repForm.UserID">
                   <option value="">Select a User</option>
                   <option v-for="user in availableUsers" :key="user.UserID" :value="user.UserID">
-                    {{ user.User_fName }} {{ user.User_lName }} ({{ user.Username }})
+                    {{ user.User_fName }} {{ user.User_lName }}
                   </option>
-                </select>
-              </div>
-              <div v-if="editingRep" class="form-group">
-                <label>Status:</label>
-                <select v-model="repForm.Deleted">
-                  <option value="No">Active</option>
-                  <option value="Yes">Inactive</option>
                 </select>
               </div>
               <div class="form-actions">
@@ -223,26 +199,6 @@
                 <button type="button" @click="cancelRepForm" class="btn-cancel">Cancel</button>
               </div>
             </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- Sales Rep Details Modal -->
-      <div v-if="selectedRep" class="modal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Sales Rep Details</h3>
-            <button @click="selectedRep = null" class="close-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div class="details-section">
-              <p><strong>ID:</strong> {{ selectedRep.SalesRepID }}</p>
-              <p><strong>Name:</strong> {{ selectedRep.SalesRep_fName }} {{ selectedRep.SalesRep_lName }}</p>
-              <p><strong>Status:</strong> {{ selectedRep.Deleted === 'No' ? 'Active' : 'Inactive' }}</p>
-            </div>
-            <div class="form-actions">
-              <button @click="editSalesRep(selectedRep)" class="btn-edit">Edit</button>
-            </div>
           </div>
         </div>
       </div>
@@ -293,6 +249,9 @@
                 <button @click="editUser(user)" class="btn-edit">
                   Edit
                 </button>
+                <button @click="deleteUser(user.UserID)" class="btn-delete">
+                  Delete
+                </button>
               </td>
             </tr>
           </tbody>
@@ -310,23 +269,23 @@
             <form @submit.prevent="saveUser">
               <div class="form-group">
                 <label>First Name:</label>
-                <input v-model="userForm.User_fName" required />
+                <input v-model="userForm.User_fName" type="text" required />
               </div>
               <div class="form-group">
                 <label>Last Name:</label>
-                <input v-model="userForm.User_lName" required />
+                <input v-model="userForm.User_lName" type="text" required />
               </div>
               <div class="form-group">
                 <label>Username:</label>
-                <input v-model="userForm.Username" required />
+                <input v-model="userForm.Username" type="text" required />
               </div>
               <div v-if="!editingUser" class="form-group">
                 <label>Password:</label>
-                <input type="password" v-model="userForm.UserPassword" required />
+                <input v-model="userForm.UserPassword" type="password" required />
               </div>
               <div v-else class="form-group">
                 <label>New Password (leave blank to keep current):</label>
-                <input type="password" v-model="userForm.UserPassword" />
+                <input v-model="userForm.UserPassword" type="password" />
               </div>
               <div class="form-group">
                 <label>User Type:</label>
@@ -349,28 +308,6 @@
                 <button type="button" @click="cancelUserForm" class="btn-cancel">Cancel</button>
               </div>
             </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- User Details Modal -->
-      <div v-if="selectedUser" class="modal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>User Details</h3>
-            <button @click="selectedUser = null" class="close-btn">&times;</button>
-          </div>
-          <div class="modal-body">
-            <div class="details-section">
-              <p><strong>ID:</strong> {{ selectedUser.UserID }}</p>
-              <p><strong>Name:</strong> {{ selectedUser.User_fName }} {{ selectedUser.User_lName }}</p>
-              <p><strong>Username:</strong> {{ selectedUser.Username }}</p>
-              <p><strong>User Type:</strong> {{ selectedUser.User_Type }}</p>
-              <p><strong>Status:</strong> {{ selectedUser.Deleted === 'no' ? 'Active' : 'Inactive' }}</p>
-            </div>
-            <div class="form-actions">
-              <button @click="editUser(selectedUser)" class="btn-edit">Edit</button>
-            </div>
           </div>
         </div>
       </div>
@@ -400,35 +337,31 @@ export default {
         users: null
       },
 
-      // Technician data
+      // Data
       technicians: [],
-      selectedTech: null,
+      salesReps: [],
+      users: [],
+
+      // UI State
       editingTech: null,
       showTechCreateForm: false,
+      editingRep: null,
+      showRepCreateForm: false,
+      editingUser: null,
+      showUserCreateForm: false,
+
+      // Forms
       techForm: {
-        Tech_fName: '',
-        Tech_lName: '',
+        firstName: '',
+        lastName: '',
         UserID: '',
         Deleted: 'No'
       },
-
-      // Sales rep data
-      salesReps: [],
-      selectedRep: null,
-      editingRep: null,
-      showRepCreateForm: false,
       repForm: {
         SalesRep_fName: '',
         SalesRep_lName: '',
-        UserID: '',
-        Deleted: 'No'
+        UserID: ''
       },
-
-      // User data
-      users: [],
-      selectedUser: null,
-      editingUser: null,
-      showUserCreateForm: false,
       userForm: {
         User_fName: '',
         User_lName: '',
@@ -437,18 +370,15 @@ export default {
         User_Type: 'standard',
         Deleted: 'no'
       }
-    }
+    };
   },
   computed: {
-    availableUsers() {
-      return this.users.filter(user => user.Deleted === 'no');
-    },
     connectionStatusClass() {
       if (!this.connectionStatus) return '';
       return this.connectionStatus === 'connected' ? 'status-connected' : 'status-error';
     },
     connectionStatusMessage() {
-      switch(this.connectionStatus) {
+      switch (this.connectionStatus) {
         case 'connected':
           return 'API Connected';
         case 'error':
@@ -456,6 +386,9 @@ export default {
         default:
           return '';
       }
+    },
+    availableUsers() {
+      return this.users.filter(user => user.Deleted === 'no');
     }
   },
   created() {
@@ -469,7 +402,6 @@ export default {
         const result = await api.testConnection();
         this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
 
-        // Auto-hide success message after 3 seconds
         if (this.connectionStatus === 'connected') {
           setTimeout(() => {
             this.connectionStatus = null;
@@ -482,17 +414,16 @@ export default {
     },
 
     // Load all data
-    loadData() {
-      this.loadUsers();
-      this.loadTechnicians();
-      this.loadSalesReps();
+    async loadData() {
+      await this.loadUsers();
+      await this.loadTechnicians();
+      await this.loadSalesReps();
     },
 
-    // User data methods
+    // User methods
     async loadUsers() {
       this.loading.users = true;
       this.error.users = null;
-
       try {
         this.users = await api.getUsers();
       } catch (error) {
@@ -504,44 +435,55 @@ export default {
     },
 
     viewUserDetails(user) {
-      this.selectedUser = user;
+      // Implement detailed view if needed
+      alert(`User Details:\nName: ${user.User_fName} ${user.User_lName}\nUsername: ${user.Username}`);
     },
 
     editUser(user) {
       this.editingUser = user;
-      // Create a copy of the user data for editing
-      const userCopy = { ...user };
-      // Don't include password for editing
-      delete userCopy.UserPassword;
-      this.userForm = userCopy;
-
-      // If a user was being viewed, close the view modal
-      this.selectedUser = null;
+      this.userForm = {
+        User_fName: user.User_fName,
+        User_lName: user.User_lName,
+        Username: user.Username,
+        UserPassword: '', // Don't pre-fill password
+        User_Type: user.User_Type,
+        Deleted: user.Deleted
+      };
+      this.showUserCreateForm = true;
     },
 
     async saveUser() {
       try {
         if (this.editingUser) {
-          // If password field is empty, remove it to avoid updating password
+          // Remove password if empty to avoid updating with empty string
           if (!this.userForm.UserPassword) {
-            delete this.userForm.UserPassword;
+            const { UserPassword, ...userData } = this.userForm;
+            await api.updateUser(this.editingUser.UserID, userData);
+          } else {
+            await api.updateUser(this.editingUser.UserID, this.userForm);
           }
-
-          await api.updateUser(this.editingUser.UserID, this.userForm);
-
-          // Refresh the users list
-          await this.loadUsers();
         } else {
           await api.createUser(this.userForm);
-
-          // Refresh the users list
-          await this.loadUsers();
         }
-
+        await this.loadUsers();
         this.cancelUserForm();
       } catch (error) {
         console.error('Error saving user:', error);
         alert(`Error saving user: ${error.message}`);
+      }
+    },
+
+    async deleteUser(userId) {
+      if (confirm('Are you sure you want to delete this user?')) {
+        try {
+          await api.fetchData(`/users/${userId}`, {
+            method: 'DELETE'
+          });
+          await this.loadUsers();
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          alert(`Error deleting user: ${error.message}`);
+        }
       }
     },
 
@@ -558,11 +500,10 @@ export default {
       };
     },
 
-    // Technician data methods
+    // Technician methods
     async loadTechnicians() {
       this.loading.technicians = true;
       this.error.technicians = null;
-
       try {
         this.technicians = await api.getTechnicians();
       } catch (error) {
@@ -574,26 +515,37 @@ export default {
     },
 
     viewTechnicianDetails(tech) {
-      this.selectedTech = tech;
+      // Implement detailed view if needed
+      alert(`Technician Details:\nName: ${tech.firstName} ${tech.lastName}\nStatus: ${tech.Deleted === 'No' ? 'Active' : 'Inactive'}`);
     },
 
     editTechnician(tech) {
       this.editingTech = tech;
-      this.techForm = { ...tech };
-
-      // If a technician was being viewed, close the view modal
-      this.selectedTech = null;
+      this.techForm = {
+        firstName: tech.firstName,
+        lastName: tech.lastName,
+        UserID: tech.UserID,
+        Deleted: tech.Deleted
+      };
+      this.showTechCreateForm = true;
     },
 
     async saveTechnician() {
       try {
         if (this.editingTech) {
-          await api.updateTechnician(this.editingTech.TechID, this.techForm);
+          await api.updateTechnician(this.editingTech.TechID, {
+            Tech_fName: this.techForm.firstName,
+            Tech_lName: this.techForm.lastName,
+            UserID: this.techForm.UserID || null,
+            Deleted: this.techForm.Deleted
+          });
         } else {
-          await api.createTechnician(this.techForm);
+          await api.createTechnician({
+            firstName: this.techForm.firstName,
+            lastName: this.techForm.lastName,
+            userID: this.techForm.UserID || null
+          });
         }
-
-        // Refresh the technicians list
         await this.loadTechnicians();
         this.cancelTechForm();
       } catch (error) {
@@ -602,58 +554,94 @@ export default {
       }
     },
 
+    async deleteTechnician(techId) {
+      if (confirm('Are you sure you want to delete this technician?')) {
+        try {
+          await api.fetchData(`/technicians/${techId}`, {
+            method: 'DELETE'
+          });
+          await this.loadTechnicians();
+        } catch (error) {
+          console.error('Error deleting technician:', error);
+          alert(`Error deleting technician: ${error.message}`);
+        }
+      }
+    },
+
     cancelTechForm() {
       this.editingTech = null;
       this.showTechCreateForm = false;
       this.techForm = {
-        Tech_fName: '',
-        Tech_lName: '',
+        firstName: '',
+        lastName: '',
         UserID: '',
         Deleted: 'No'
       };
     },
 
-    // Sales rep data methods
+    // Sales Rep methods
     async loadSalesReps() {
       this.loading.salesReps = true;
       this.error.salesReps = null;
-
       try {
         this.salesReps = await api.getSalesReps();
       } catch (error) {
         console.error('Error loading sales reps:', error);
-        this.error.salesReps = `Failed to load sales representatives: ${error.message}`;
+        this.error.salesReps = `Failed to load sales reps: ${error.message}`;
       } finally {
         this.loading.salesReps = false;
       }
     },
 
     viewSalesRepDetails(rep) {
-      this.selectedRep = rep;
+      // Implement detailed view if needed
+      alert(`Sales Rep Details:\nName: ${rep.SalesRep_fName} ${rep.SalesRep_lName}`);
     },
 
     editSalesRep(rep) {
       this.editingRep = rep;
-      this.repForm = { ...rep };
-
-      // If a sales rep was being viewed, close the view modal
-      this.selectedRep = null;
+      this.repForm = {
+        SalesRep_fName: rep.SalesRep_fName,
+        SalesRep_lName: rep.SalesRep_lName,
+        UserID: rep.UserID
+      };
+      this.showRepCreateForm = true;
     },
 
     async saveSalesRep() {
       try {
         if (this.editingRep) {
-          await api.updateSalesRep(this.editingRep.SalesRepID, this.repForm);
+          await api.updateSalesRep(this.editingRep.SalesRepID, {
+            firstName: this.repForm.SalesRep_fName,
+            lastName: this.repForm.SalesRep_lName,
+            userID: this.repForm.UserID || null
+          });
         } else {
-          await api.createSalesRep(this.repForm);
+          await api.createSalesRep({
+            firstName: this.repForm.SalesRep_fName,
+            lastName: this.repForm.SalesRep_lName,
+            userID: this.repForm.UserID || null
+          });
         }
-
-        // Refresh the sales reps list
         await this.loadSalesReps();
         this.cancelRepForm();
       } catch (error) {
         console.error('Error saving sales rep:', error);
-        alert(`Error saving sales representative: ${error.message}`);
+        alert(`Error saving sales rep: ${error.message}`);
+      }
+    },
+
+    async deleteSalesRep(repId) {
+      if (confirm('Are you sure you want to delete this sales rep?')) {
+        try {
+          await api.fetchData(`/sales_reps/${repId}`, {
+            method: 'DELETE'
+          });
+          await this.loadSalesReps();
+        } catch (error) {
+          console.error('Error deleting sales rep:', error);
+          alert(`Error deleting sales rep: ${error.message}`);
+        }
       }
     },
 
@@ -663,10 +651,9 @@ export default {
       this.repForm = {
         SalesRep_fName: '',
         SalesRep_lName: '',
-        UserID: '',
-        Deleted: 'No'
+        UserID: ''
       };
     }
   }
-}
+};
 </script>

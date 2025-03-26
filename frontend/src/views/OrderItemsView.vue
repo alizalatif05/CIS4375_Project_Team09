@@ -56,16 +56,14 @@
           <table v-else>
             <thead>
               <tr>
-                <th>SKU Number</th>
                 <th>Item Name</th>
-                <th>Quantity</th>
+                <th>SKU Number</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in orderItems" :key="item.SKU_Number">
+                <td>{{ item.ItemName }}</td>
                 <td>{{ item.SKU_Number }}</td>
-                <td>{{ getItemName(item.SKU_Number) }}</td>
-                <td>{{ item.Quantity }}</td>
               </tr>
             </tbody>
           </table>
@@ -87,7 +85,7 @@
               <select v-model="orderForm.CustomerID" required>
                 <option value="">Select a Customer</option>
                 <option v-for="customer in customers" :key="customer.CustomerID" :value="customer.CustomerID">
-                  {{ customer.Customer_fName }} {{ customer.Customer_lName }}
+                  {{ customer.firstName }} {{ customer.lastName }}
                 </option>
               </select>
             </div>
@@ -105,7 +103,7 @@
               <select v-model="orderForm.TechID" required>
                 <option value="">Select a Technician</option>
                 <option v-for="technician in technicians" :key="technician.TechID" :value="technician.TechID">
-                  {{ technician.Tech_fName }} {{ technician.Tech_lName }}
+                  {{ technician.firstName }} {{ technician.lastName }}
                 </option>
               </select>
             </div>
@@ -230,7 +228,6 @@ export default {
     async loadOrders() {
       this.loading.orders = true;
       this.error.orders = null;
-
       try {
         this.orders = await api.getOrders();
       } catch (error) {
@@ -245,9 +242,9 @@ export default {
     async loadOrderItems(orderID) {
       this.loading.orderItems = true;
       this.error.orderItems = null;
-
       try {
-        this.orderItems = await api.getOrderItems(orderID);
+        const orderDetails = await api.fetchData(`/orders/${orderID}/details`);
+        this.orderItems = orderDetails;
       } catch (error) {
         console.error('Error loading order items:', error);
         this.error.orderItems = `Failed to load order items: ${error.message}`;
@@ -260,7 +257,6 @@ export default {
     async loadCustomers() {
       this.loading.customers = true;
       this.error.customers = null;
-
       try {
         this.customers = await api.getCustomers();
       } catch (error) {
@@ -275,7 +271,6 @@ export default {
     async loadSalesReps() {
       this.loading.salesReps = true;
       this.error.salesReps = null;
-
       try {
         this.salesReps = await api.getSalesReps();
       } catch (error) {
@@ -290,7 +285,6 @@ export default {
     async loadTechnicians() {
       this.loading.technicians = true;
       this.error.technicians = null;
-
       try {
         this.technicians = await api.getTechnicians();
       } catch (error) {
@@ -305,7 +299,6 @@ export default {
     async loadInventory() {
       this.loading.inventory = true;
       this.error.inventory = null;
-
       try {
         this.inventory = await api.getInventory();
       } catch (error) {
@@ -319,7 +312,7 @@ export default {
     // Helper methods to get names
     getCustomerName(customerID) {
       const customer = this.customers.find(c => c.CustomerID === customerID);
-      return customer ? `${customer.Customer_fName} ${customer.Customer_lName}` : 'Unknown';
+      return customer ? `${customer.firstName} ${customer.lastName}` : 'Unknown';
     },
 
     getSalesRepName(salesRepID) {
@@ -329,12 +322,7 @@ export default {
 
     getTechnicianName(techID) {
       const technician = this.technicians.find(t => t.TechID === techID);
-      return technician ? `${technician.Tech_fName} ${technician.Tech_lName}` : 'Unknown';
-    },
-
-    getItemName(skuNumber) {
-      const item = this.inventory.find(i => i.SKU_Number === skuNumber);
-      return item ? item.ItemName : 'Unknown';
+      return technician ? `${technician.firstName} ${technician.lastName}` : 'Unknown';
     },
 
     // Toggle order details
@@ -355,21 +343,70 @@ export default {
         CustomerID: order.CustomerID,
         SalesRepID: order.SalesRepID,
         TechID: order.TechID,
-        Items: order.Items || []
+        Items: []
       };
+
+      // Load items for this order
+      this.loadOrderItems(order.OrderID).then(() => {
+        this.orderForm.Items = this.orderItems.map(item => item.SKU_Number);
+      });
+
       this.showOrderCreateForm = true;
+    },
+
+    // Add items to order
+    async addItemsToOrder(orderID, items) {
+      try {
+        for (const sku of items) {
+          await api.fetchData('/orderitems', {
+            method: 'POST',
+            body: JSON.stringify({
+              skuNumber: sku,
+              orderID: orderID
+            })
+          });
+        }
+      } catch (error) {
+        console.error('Error adding items to order:', error);
+        throw error;
+      }
     },
 
     // Save order
     async saveOrder() {
       try {
+        const orderData = {
+          customerID: this.orderForm.CustomerID,
+          techID: this.orderForm.TechID,
+          salesRepID: this.orderForm.SalesRepID
+        };
+
         if (this.editingOrder) {
-          await api.updateOrder(this.editingOrder.OrderID, this.orderForm);
+          // Update existing order
+          await api.fetchData(`/orders/${this.editingOrder.OrderID}`, {
+            method: 'PUT',
+            body: JSON.stringify(orderData)
+          });
+
+          // Update order items (this would need a more sophisticated implementation)
+          await this.addItemsToOrder(this.editingOrder.OrderID, this.orderForm.Items);
         } else {
-          await api.createOrder(this.orderForm);
+          // Create new order
+          await api.fetchData('/orders', {
+            method: 'POST',
+            body: JSON.stringify(orderData)
+          });
+
+          // Get the newly created order
+          const orderResponse = await api.getOrders();
+          const newOrder = orderResponse[orderResponse.length - 1];
+
+          // Add items to the new order
+          if (this.orderForm.Items.length > 0) {
+            await this.addItemsToOrder(newOrder.OrderID, this.orderForm.Items);
+          }
         }
 
-        // Refresh the orders list
         await this.loadOrders();
         this.cancelOrderForm();
       } catch (error) {
@@ -382,8 +419,9 @@ export default {
     async deleteOrder(orderID) {
       if (confirm('Are you sure you want to delete this order?')) {
         try {
-          await api.deleteOrder(orderID);
-          // Refresh the orders list
+          await api.fetchData(`/orders/${orderID}`, {
+            method: 'DELETE'
+          });
           await this.loadOrders();
         } catch (error) {
           console.error('Error deleting order:', error);
