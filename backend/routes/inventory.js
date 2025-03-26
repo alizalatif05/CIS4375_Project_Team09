@@ -131,7 +131,7 @@ router.get('/orders', authenticateUser, (req, res) => {
 });
 
 router.get('/orders/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Orders WHERE OrderID = ?', [req.params.id], (err, results) => {
+    pool.query('SELECT * FROM `Order` WHERE OrderID = ?', [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
         res.json(results[0] || {});
     });
@@ -525,23 +525,210 @@ router.post('/orderitems', authenticateUser, (req, res) => {
 });
 
 /**
- * DELETE API (soft delete)
+ * DELETE /api/orders/:id - Soft delete an order
  */
-router.delete('/inventory/:id', authenticateUser, (req, res) => {
-    const inventoryId = req.params.id;
+router.delete('/orders/:id', authenticateUser, (req, res) => {
+    const query = 'UPDATE `Order` SET Deleted = "Yes" WHERE OrderID = ?';
+    pool.query(query, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Also soft delete all associated order items
+        pool.query('UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id], (err) => {
+            if (err) {
+                console.error('Error deleting order items:', err);
+                // Still return success for the order deletion
+                return res.json({
+                    message: 'Order soft deleted (but some items may not have been removed)'
+                });
+            }
+            res.json({ message: 'Order and all items soft deleted' });
+        });
+    });
+});
+
+/**
+ * DELETE /api/orderitems/:orderId/:sku - Soft delete a specific item from an order
+ */
+router.delete('/orderitems/:orderId/:sku', authenticateUser, (req, res) => {
+    const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ? AND SKU_Number = ?';
+    pool.query(query, [req.params.orderId, req.params.sku], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'Order item not found or already deleted'
+            });
+        }
+        res.json({ message: 'Order item soft deleted' });
+    });
+});
+
+/**
+ * DELETE /api/orderitems/:orderId - Soft delete all items from an order
+ */
+router.delete('/orderitems/:orderId', authenticateUser, (req, res) => {
+    const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?';
+    pool.query(query, [req.params.orderId], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'No order items found or already deleted'
+            });
+        }
+        res.json({
+            message: `All items from order ${req.params.orderId} soft deleted`,
+            count: result.affectedRows
+        });
+    });
+});
+
+/**
+ * DELETE API for Customer
+ */
+
+router.delete('/customers/:id', authenticateUser, (req, res) => {
+    const query = 'UPDATE Customer SET Deleted = "Yes" WHERE CustomerID = ?';
+    pool.query(query, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        res.json({ message: 'Customer soft deleted' });
+    });
+});
+
+/**
+ * POST API for TechInventory
+ */
+router.post('/techinventory', authenticateUser, (req, res) => {
+    const { skuNumber, techId } = req.body;
+
+    // Validate required fields
+    if (!skuNumber || !techId) {
+        return res.status(400).json({ message: 'SKU Number and Technician ID are required' });
+    }
 
     const query = `
-        UPDATE Inventory SET Deleted = 'Yes' WHERE SKU_Number = ?;
+        INSERT INTO TechInventory (SKU_Number, TechID)
+        VALUES (?, ?);
     `;
 
-    pool.query(query, [inventoryId], (err, result) => {
+    pool.query(query, [skuNumber, techId], (err, result) => {
+        if (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ message: 'This item is already assigned to this technician' });
+            }
+            return res.status(500).json({ message: 'Database query error', error: err.message });
+        }
+        res.status(201).json({
+            message: 'Inventory item assigned to technician successfully',
+            assignmentId: result.insertId
+        });
+    });
+});
+
+/**
+ * PUT API for TechInventory
+ */
+router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, (req, res) => {
+    const { oldSku, oldTechId } = req.params;
+    const { newSkuNumber, newTechId } = req.body;
+
+    // Validate at least one field to update
+    if (!newSkuNumber && !newTechId) {
+        return res.status(400).json({ message: 'At least one field (newSkuNumber or newTechId) is required for update' });
+    }
+
+    // Build the dynamic query
+    let query = 'UPDATE TechInventory SET ';
+    const values = [];
+
+    if (newSkuNumber) {
+        query += 'SKU_Number = ?';
+        values.push(newSkuNumber);
+    }
+
+    if (newTechId) {
+        if (newSkuNumber) query += ', ';
+        query += 'TechID = ?';
+        values.push(newTechId);
+    }
+
+    query += ' WHERE SKU_Number = ? AND TechID = ?';
+    values.push(oldSku, oldTechId);
+
+    pool.query(query, values, (err, result) => {
+        if (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({ message: 'This assignment already exists' });
+            }
+            return res.status(500).json({ message: 'Database query error', error: err.message });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Technician inventory assignment not found' });
+        }
+
+        res.json({
+            message: 'Technician inventory assignment updated successfully',
+            changes: result.affectedRows
+        });
+    });
+});
+
+/**
+ * DELETE API for Inventory
+ */
+
+router.delete('/techinventory/:sku/:techId', authenticateUser, (req, res) => {
+    const query = 'UPDATE TechInventory SET Deleted = "Yes" WHERE SKU_Number = ? AND TechID = ?';
+    pool.query(query, [req.params.sku, req.params.techId], (err, result) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json({ message: 'Inventory item soft deleted' });
+        res.json({ message: 'Technician inventory assignment removed' });
     });
 });
 
 
+/**
+ * DELETE /api/users/:id - Soft delete a user
+ */
+router.delete('/users/:id', authenticateUser, authorizeAdmin, (req, res) => {
+    const query = 'UPDATE User SET Deleted = "yes" WHERE UserID = ?';
+    pool.query(query, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json({ message: 'User soft deleted' });
+    });
+});
 
+/**
+ * DELETE /api/sales_reps/:id - Soft delete a sales representative
+ */
+router.delete('/sales_reps/:id', authenticateUser, authorizeAdmin, (req, res) => {
+    const query = 'UPDATE SalesRep SET Deleted = "Yes" WHERE SalesRepID = ?';
+    pool.query(query, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Sales representative not found' });
+        }
+        res.json({ message: 'Sales representative soft deleted' });
+    });
+});
+
+/**
+ * DELETE /api/technicians/:id - Soft delete a technician
+ */
+router.delete('/technicians/:id', authenticateUser, authorizeAdmin, (req, res) => {
+    const query = 'UPDATE Technician SET Deleted = "Yes" WHERE TechID = ?';
+    pool.query(query, [req.params.id], (err, result) => {
+        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Technician not found' });
+        }
+        res.json({ message: 'Technician soft deleted' });
+    });
+});
 
 /**
  * GET /api/order/:id/details - retrieving full order details
@@ -558,6 +745,7 @@ router.get('/orders/:id/details', authenticateUser, (req, res) => {
         JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
         WHERE o.OrderID = ?;
     `;
+
 
     pool.query(query, [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ message: 'Database query error' });
