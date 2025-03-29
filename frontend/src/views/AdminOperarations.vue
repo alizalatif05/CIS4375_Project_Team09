@@ -48,7 +48,6 @@
               <th>First Name</th>
               <th>Last Name</th>
               <th>User ID</th>
-              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -59,14 +58,6 @@
               <td>{{ tech.lastName }}</td>
               <td>{{ tech.UserID }}</td>
               <td>
-                <span :class="['status-badge', tech.Deleted === 'No' ? 'active' : 'inactive']">
-                  {{ tech.Deleted === 'No' ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td>
-                <button @click="viewTechnicianDetails(tech)" class="btn-view">
-                  View
-                </button>
                 <button @click="editTechnician(tech)" class="btn-edit">
                   Edit
                 </button>
@@ -153,9 +144,6 @@
               <td>{{ rep.SalesRep_lName }}</td>
               <td>{{ rep.UserID }}</td>
               <td>
-                <button @click="viewSalesRepDetails(rep)" class="btn-view">
-                  View
-                </button>
                 <button @click="editSalesRep(rep)" class="btn-edit">
                   Edit
                 </button>
@@ -236,16 +224,13 @@
               <td>{{ user.User_fName }}</td>
               <td>{{ user.User_lName }}</td>
               <td>{{ user.Username }}</td>
-              <td>{{ user.User_Type }}</td>
+              <td>{{ user.UserType }}</td>
               <td>
-                <span :class="['status-badge', user.Deleted === 'no' ? 'active' : 'inactive']">
-                  {{ user.Deleted === 'no' ? 'Active' : 'Inactive' }}
+                <span :class="['status-badge', user.Deleted === 'No' ? 'active' : 'inactive']">
+                  {{ user.Deleted === 'No' ? 'Active' : 'Inactive' }}
                 </span>
               </td>
               <td>
-                <button @click="viewUserDetails(user)" class="btn-view">
-                  View
-                </button>
                 <button @click="editUser(user)" class="btn-edit">
                   Edit
                 </button>
@@ -289,7 +274,7 @@
               </div>
               <div class="form-group">
                 <label>User Type:</label>
-                <select v-model="userForm.User_Type" required>
+                <select v-model="userForm.UserType" required>
                   <option value="admin">Admin</option>
                   <option value="technician">Technician</option>
                   <option value="sales">Sales</option>
@@ -299,8 +284,8 @@
               <div v-if="editingUser" class="form-group">
                 <label>Status:</label>
                 <select v-model="userForm.Deleted">
-                  <option value="no">Active</option>
-                  <option value="yes">Inactive</option>
+                  <option value="No">Active</option>
+                  <option value="Yes">Inactive</option>
                 </select>
               </div>
               <div class="form-actions">
@@ -367,8 +352,8 @@ export default {
         User_lName: '',
         Username: '',
         UserPassword: '',
-        User_Type: 'standard',
-        Deleted: 'no'
+        UserType: 'standard',
+        Deleted: 'No'
       }
     };
   },
@@ -388,7 +373,7 @@ export default {
       }
     },
     availableUsers() {
-      return this.users.filter(user => user.Deleted === 'no');
+      return this.users.filter(user => user.Deleted === 'No');
     }
   },
   created() {
@@ -434,10 +419,6 @@ export default {
       }
     },
 
-    viewUserDetails(user) {
-      // Implement detailed view if needed
-      alert(`User Details:\nName: ${user.User_fName} ${user.User_lName}\nUsername: ${user.Username}`);
-    },
 
     editUser(user) {
       this.editingUser = user;
@@ -446,7 +427,7 @@ export default {
         User_lName: user.User_lName,
         Username: user.Username,
         UserPassword: '', // Don't pre-fill password
-        User_Type: user.User_Type,
+        UserType: user.UserType,
         Deleted: user.Deleted
       };
       this.showUserCreateForm = true;
@@ -454,16 +435,26 @@ export default {
 
     async saveUser() {
       try {
+        // Prepare user data with correct field names
+        const userData = {
+          User_fName: this.userForm.User_fName,
+          User_lName: this.userForm.User_lName,
+          Username: this.userForm.Username,
+          UserPassword: this.userForm.UserPassword,
+          UserType: this.userForm.UserType,
+          Deleted: this.userForm.Deleted
+        };
+
         if (this.editingUser) {
           // Remove password if empty to avoid updating with empty string
-          if (!this.userForm.UserPassword) {
-            const { UserPassword, ...userData } = this.userForm;
-            await api.updateUser(this.editingUser.UserID, userData);
+          if (!userData.UserPassword) {
+            const { UserPassword, ...updateData } = userData;
+            await api.updateUser(this.editingUser.UserID, updateData);
           } else {
-            await api.updateUser(this.editingUser.UserID, this.userForm);
+            await api.updateUser(this.editingUser.UserID, userData);
           }
         } else {
-          await api.createUser(this.userForm);
+          await api.createUser(userData);
         }
         await this.loadUsers();
         this.cancelUserForm();
@@ -495,8 +486,8 @@ export default {
         User_lName: '',
         Username: '',
         UserPassword: '',
-        User_Type: 'standard',
-        Deleted: 'no'
+        UserType: 'standard',
+        Deleted: 'No'
       };
     },
 
@@ -514,11 +505,6 @@ export default {
       }
     },
 
-    viewTechnicianDetails(tech) {
-      // Implement detailed view if needed
-      alert(`Technician Details:\nName: ${tech.firstName} ${tech.lastName}\nStatus: ${tech.Deleted === 'No' ? 'Active' : 'Inactive'}`);
-    },
-
     editTechnician(tech) {
       this.editingTech = tech;
       this.techForm = {
@@ -532,19 +518,17 @@ export default {
 
     async saveTechnician() {
       try {
+        const techData = {
+          Tech_fName: this.techForm.firstName,
+          Tech_lName: this.techForm.lastName,
+          UserID: this.techForm.UserID || null,
+          Deleted: this.techForm.Deleted
+        };
+
         if (this.editingTech) {
-          await api.updateTechnician(this.editingTech.TechID, {
-            Tech_fName: this.techForm.firstName,
-            Tech_lName: this.techForm.lastName,
-            UserID: this.techForm.UserID || null,
-            Deleted: this.techForm.Deleted
-          });
+          await api.updateTechnician(this.editingTech.TechID, techData);
         } else {
-          await api.createTechnician({
-            firstName: this.techForm.firstName,
-            lastName: this.techForm.lastName,
-            userID: this.techForm.UserID || null
-          });
+          await api.createTechnician(techData);
         }
         await this.loadTechnicians();
         this.cancelTechForm();
@@ -593,11 +577,6 @@ export default {
       }
     },
 
-    viewSalesRepDetails(rep) {
-      // Implement detailed view if needed
-      alert(`Sales Rep Details:\nName: ${rep.SalesRep_fName} ${rep.SalesRep_lName}`);
-    },
-
     editSalesRep(rep) {
       this.editingRep = rep;
       this.repForm = {
@@ -610,18 +589,16 @@ export default {
 
     async saveSalesRep() {
       try {
+        const repData = {
+          SalesRep_fName: this.repForm.SalesRep_fName,
+          SalesRep_lName: this.repForm.SalesRep_lName,
+          UserID: this.repForm.UserID || null
+        };
+
         if (this.editingRep) {
-          await api.updateSalesRep(this.editingRep.SalesRepID, {
-            firstName: this.repForm.SalesRep_fName,
-            lastName: this.repForm.SalesRep_lName,
-            userID: this.repForm.UserID || null
-          });
+          await api.updateSalesRep(this.editingRep.SalesRepID, repData);
         } else {
-          await api.createSalesRep({
-            firstName: this.repForm.SalesRep_fName,
-            lastName: this.repForm.SalesRep_lName,
-            userID: this.repForm.UserID || null
-          });
+          await api.createSalesRep(repData);
         }
         await this.loadSalesReps();
         this.cancelRepForm();

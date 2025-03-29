@@ -151,8 +151,8 @@
               <td>{{ techItem.ItemName }}</td>
               <td>{{ techItem.Item_Desc }}</td>
               <td>
-                <button @click="viewTechInventoryDetails(techItem)" class="btn-view">
-                  View
+                <button @click="editTechInventory(techItem)" class="btn-edit">
+                  Edit
                 </button>
                 <button @click="deleteTechInventory(techItem.SKU_Number, techItem.TechID)" class="btn-delete">
                   Remove
@@ -232,6 +232,7 @@ export default {
       // UI State
       selectedInventory: null,
       editingInventory: null,
+      editingTechInventory: null,
       showInventoryCreateForm: false,
       showTechInventoryCreateForm: false,
 
@@ -320,21 +321,35 @@ export default {
       this.showInventoryCreateForm = true;
     },
 
+    editTechInventory(techItem) {
+      this.editingTechInventory = techItem;
+      this.techInventoryForm = {
+        SKU_Number: techItem.SKU_Number,
+        TechID: techItem.TechID
+      };
+      this.showTechInventoryCreateForm = true;
+    },
+
     async saveInventory() {
       try {
         if (this.editingInventory) {
           await api.fetchData(`/inventory/${this.editingInventory.SKU_Number}`, {
             method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
               name: this.inventoryForm.ItemName,
               quantity: this.inventoryForm.Item_Quantity,
-              location: '', // These fields may need to be adjusted based on your actual DB schema
-              category: this.inventoryForm.Item_Desc
+              itemDesc: this.inventoryForm.Item_Desc // Changed from 'category' to 'itemDesc'
             })
           });
         } else {
           await api.fetchData('/inventory', {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
               itemName: this.inventoryForm.ItemName,
               itemDesc: this.inventoryForm.Item_Desc,
@@ -388,6 +403,7 @@ export default {
       }
     },
 
+
     async loadTechnicians() {
       this.loading.technicians = true;
       this.error.technicians = null;
@@ -401,20 +417,33 @@ export default {
       }
     },
 
-    viewTechInventoryDetails(techItem) {
-      // You can implement a detailed view if needed
-      alert(`Viewing assignment: ${techItem.SKU_Number} to Tech ${techItem.TechID}`);
-    },
-
     async saveTechInventory() {
       try {
-        await api.fetchData('/techinventory', {
-          method: 'POST',
-          body: JSON.stringify({
-            SKU_Number: this.techInventoryForm.SKU_Number,
-            TechID: this.techInventoryForm.TechID
-          })
-        });
+        if (this.editingTechInventory) {
+          // Update existing assignment
+          await api.fetchData(`/techinventory/${this.editingTechInventory.SKU_Number}/${this.editingTechInventory.TechID}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              newSkuNumber: this.techInventoryForm.SKU_Number,
+              newTechId: this.techInventoryForm.TechID
+            })
+          });
+        } else {
+          // Create new assignment (or reactivate soft-deleted one)
+          await api.fetchData('/techinventory', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              skuNumber: this.techInventoryForm.SKU_Number,
+              techId: this.techInventoryForm.TechID
+            })
+          });
+        }
         await this.loadTechnicianInventory();
         this.cancelTechInventoryForm();
       } catch (error) {

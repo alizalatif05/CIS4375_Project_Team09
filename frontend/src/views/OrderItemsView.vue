@@ -40,6 +40,7 @@
                   {{ expandedOrder === order.OrderID ? 'Hide' : 'View' }}
                 </button>
                 <button @click="editOrder(order)" class="btn-edit">Edit</button>
+                <button @click="showAddItems(order)" class="btn-add">Add Items</button>
                 <button @click="deleteOrder(order.OrderID)" class="btn-delete">Delete</button>
               </td>
             </tr>
@@ -64,6 +65,10 @@
               <tr v-for="item in orderItems" :key="item.SKU_Number">
                 <td>{{ item.ItemName }}</td>
                 <td>{{ item.SKU_Number }}</td>
+                <td>
+                  <button @click="editOrderItem(item)" class="btn-edit">Edit</button>
+                  <button @click="deleteOrderItem(item)" class="btn-delete">Delete</button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -107,19 +112,61 @@
                 </option>
               </select>
             </div>
-            <div class="form-group">
-              <label>Items:</label>
-              <div v-for="item in availableItems" :key="item.SKU_Number">
-                <input type="checkbox" :value="item.SKU_Number" v-model="orderForm.Items" />
-                {{ item.ItemName }} ({{ item.SKU_Number }})
-              </div>
-            </div>
             <div class="form-actions">
               <button type="submit" class="btn-save">Save</button>
               <button type="button" @click="cancelOrderForm" class="btn-cancel">Cancel</button>
             </div>
           </form>
         </div>
+      </div>
+    </div>
+    <div v-if="showAddItemsModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Add Items to Order #{{ selectedOrder.OrderID }}</h3>
+          <button @click="cancelAddItems" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Select Item:</label>
+            <select v-model="selectedItem">
+              <option value="">Select an Item</option>
+              <option v-for="item in availableItems" :key="item.SKU_Number" :value="item.SKU_Number">
+                {{ item.ItemName }} ({{ item.SKU_Number }})
+              </option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button @click="addItemToOrder" class="btn-save">Add Item</button>
+            <button @click="cancelAddItems" class="btn-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div v-if="showEditItemModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Order Item</h3>
+        <button @click="cancelEditItem" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form @submit.prevent="saveEditedItem">
+          <div class="form-group">
+            <label>Item:</label>
+            <select v-model="editItemForm.SKU_Number" required>
+              <option v-for="item in availableItems"
+                      :key="item.SKU_Number"
+                      :value="item.SKU_Number">
+                {{ item.ItemName }} ({{ item.SKU_Number }})
+              </option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-save">Save</button>
+            <button type="button" @click="cancelEditItem" class="btn-cancel">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -160,6 +207,18 @@ export default {
       technicians: [],
       inventory: [],
 
+      // properties for item management
+      showAddItemsModal: false,
+      selectedOrder: null,
+      selectedItem: null,
+
+      showEditItemModal: false,
+      editItemForm: {
+        OrderID: null,
+        SKU_Number: null,
+        originalSKU: null
+      },
+
       // UI State
       expandedOrder: null,
       selectedOrder: null,
@@ -189,7 +248,7 @@ export default {
       }
     },
     availableItems() {
-      return this.inventory.filter(item => item.Deleted === 'No');
+      return this.inventory; // Remove the filter since backend already filters
     }
   },
   created() {
@@ -244,7 +303,11 @@ export default {
       this.error.orderItems = null;
       try {
         const orderDetails = await api.fetchData(`/orders/${orderID}/details`);
-        this.orderItems = orderDetails;
+        // Map the response to match your frontend expectations
+        this.orderItems = orderDetails.map(item => ({
+          ItemName: item.ItemName,
+          SKU_Number: item.SKU_Number
+        }));
       } catch (error) {
         console.error('Error loading order items:', error);
         this.error.orderItems = `Failed to load order items: ${error.message}`;
@@ -300,12 +363,33 @@ export default {
       this.loading.inventory = true;
       this.error.inventory = null;
       try {
-        this.inventory = await api.getInventory();
+        const response = await api.getInventory();
+        console.log('Inventory response:', response); // This should work now
+        if (Array.isArray(response)) {
+          this.inventory = response;
+        } else {
+          console.error('Unexpected inventory response format:', response);
+          this.error.inventory = 'Unexpected data format received from server';
+        }
       } catch (error) {
         console.error('Error loading inventory:', error);
         this.error.inventory = `Failed to load inventory: ${error.message}`;
       } finally {
         this.loading.inventory = false;
+      }
+    },
+
+    // delete order item
+    async deleteOrderItem(item) {
+      if (confirm(`Are you sure you want to remove ${item.ItemName} from this order?`)) {
+        try {
+          await api.deleteOrderItem(this.expandedOrder, item.SKU_Number);
+          // Refresh the order items
+          await this.loadOrderItems(this.expandedOrder);
+        } catch (error) {
+          console.error('Error deleting order item:', error);
+          alert(`Error deleting order item: ${error.message}`);
+        }
       }
     },
 
@@ -336,22 +420,67 @@ export default {
       }
     },
 
-    // Edit order
+    // edit order
+    editOrderItem(item) {
+      this.editItemForm = {
+        OrderID: this.expandedOrder,
+        SKU_Number: item.SKU_Number,
+        originalSKU: item.SKU_Number
+      };
+      this.showEditItemModal = true;
+    },
+
+    async saveEditedItem() {
+      try {
+        // First delete the old item
+        await api.deleteOrderItem(this.editItemForm.OrderID, this.editItemForm.originalSKU);
+
+        // Then add the new item
+        await api.addOrderItem(this.editItemForm.OrderID, this.editItemForm.SKU_Number);
+
+        // Refresh the order items
+        await this.loadOrderItems(this.expandedOrder);
+
+        this.showEditItemModal = false;
+      } catch (error) {
+        console.error('Error updating order item:', error);
+        alert(`Error updating order item: ${error.message}`);
+      }
+    },
+
+    cancelEditItem() {
+      this.showEditItemModal = false;
+      this.editItemForm = {
+        OrderID: null,
+        SKU_Number: null,
+        originalSKU: null
+      };
+    },
+
     editOrder(order) {
       this.editingOrder = order;
       this.orderForm = {
         CustomerID: order.CustomerID,
         SalesRepID: order.SalesRepID,
-        TechID: order.TechID,
-        Items: []
+        TechID: order.TechID
       };
-
-      // Load items for this order
-      this.loadOrderItems(order.OrderID).then(() => {
-        this.orderForm.Items = this.orderItems.map(item => item.SKU_Number);
-      });
-
       this.showOrderCreateForm = true;
+    },
+
+    // method to show add items modal
+    async showAddItems(order) {
+      this.selectedOrder = order;
+      try {
+        if (this.inventory.length === 0) {
+          await this.loadInventory();
+        }
+        console.log('Available items:', this.availableItems); // Check what's available
+        this.showAddItemsModal = true;
+        this.selectedItem = null;
+      } catch (error) {
+        console.error('Error preparing to add items:', error);
+        this.error.inventory = 'Failed to load inventory items';
+      }
     },
 
     // Add items to order
@@ -372,6 +501,35 @@ export default {
       }
     },
 
+    async addItemToOrder() {
+      if (!this.selectedItem) {
+        alert('Please select an item');
+        return;
+      }
+
+      try {
+        await api.addOrderItem(this.selectedOrder.OrderID, this.selectedItem);
+
+        // Refresh order items display
+        if (this.expandedOrder === this.selectedOrder.OrderID) {
+          await this.loadOrderItems(this.selectedOrder.OrderID);
+        }
+
+        this.showAddItemsModal = false;
+        this.selectedItem = null;
+      } catch (error) {
+        console.error('Error adding item to order:', error);
+        alert(`Error adding item to order: ${error.message}`);
+      }
+    },
+
+    // method to cancel add items
+    cancelAddItems() {
+      this.showAddItemsModal = false;
+      this.selectedOrder = null;
+      this.selectedItem = null;
+    },
+
     // Save order
     async saveOrder() {
       try {
@@ -387,24 +545,12 @@ export default {
             method: 'PUT',
             body: JSON.stringify(orderData)
           });
-
-          // Update order items (this would need a more sophisticated implementation)
-          await this.addItemsToOrder(this.editingOrder.OrderID, this.orderForm.Items);
         } else {
           // Create new order
           await api.fetchData('/orders', {
             method: 'POST',
             body: JSON.stringify(orderData)
           });
-
-          // Get the newly created order
-          const orderResponse = await api.getOrders();
-          const newOrder = orderResponse[orderResponse.length - 1];
-
-          // Add items to the new order
-          if (this.orderForm.Items.length > 0) {
-            await this.addItemsToOrder(newOrder.OrderID, this.orderForm.Items);
-          }
         }
 
         await this.loadOrders();

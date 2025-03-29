@@ -146,13 +146,18 @@ tbody tr:hover {
 }
 
 /* Button styles */
-.btn-view, .btn-edit, .btn-delete {
+.btn-view, .btn-edit, .btn-delete, .btn-add {
   padding: 0.25rem 0.5rem;
   margin-right: 0.5rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.8rem;
+}
+
+.btn-add {
+  background-color: #3d2b56;
+  color: white;
 }
 
 .btn-view {
@@ -171,7 +176,7 @@ tbody tr:hover {
 }
 
 .btn-delete {
-  background-color: #3D2B56;
+  background-color: #DB5461;
   color: #f2f2f2;
 }
 

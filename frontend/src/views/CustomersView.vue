@@ -63,19 +63,19 @@
           <form @submit.prevent="saveCustomer">
             <div class="form-group">
               <label>First Name:</label>
-              <input v-model="customerForm.firstName" type="text" required />
+              <input v-model="customerForm.Customer_fName" type="text" required />
             </div>
             <div class="form-group">
               <label>Last Name:</label>
-              <input v-model="customerForm.lastName" type="text" required />
+              <input v-model="customerForm.Customer_lName" type="text" required />
             </div>
             <div class="form-group">
               <label>Address:</label>
-              <input v-model="customerForm.address" type="text" required />
+              <input v-model="customerForm.CustomerAddress" type="text" required />
             </div>
             <div class="form-group">
               <label>Phone:</label>
-              <input v-model="customerForm.phone" type="text" required />
+              <input v-model="customerForm.CustomerPhone" type="text" required />
             </div>
             <div class="form-actions">
               <button type="submit" class="btn-save">Save</button>
@@ -134,10 +134,10 @@ export default {
       editingCustomer: null,
       showCustomerCreateForm: false,
       customerForm: {
-        firstName: '',
-        lastName: '',
-        address: '',
-        phone: ''
+        Customer_fName: '',
+        Customer_lName: '',
+        CustomerAddress: '',
+        CustomerPhone: ''
       }
     };
   },
@@ -201,7 +201,12 @@ export default {
     // Edit customer
     editCustomer(customer) {
       this.editingCustomer = customer;
-      this.customerForm = { ...customer };
+      this.customerForm = {
+        Customer_fName: customer.firstName,  // Maps from API response to form field
+        Customer_lName: customer.lastName,
+        CustomerAddress: customer.address,
+        CustomerPhone: customer.phone
+      };
       this.showCustomerCreateForm = true;
       this.selectedCustomer = null;
     },
@@ -209,15 +214,28 @@ export default {
     // Save customer
     async saveCustomer() {
       try {
+        const customerData = {
+          firstName: this.customerForm.Customer_fName,
+          lastName: this.customerForm.Customer_lName,
+          address: this.customerForm.CustomerAddress,
+          phone: this.customerForm.CustomerPhone
+        };
+
         if (this.editingCustomer) {
           await api.fetchData(`/customers/${this.editingCustomer.CustomerID}`, {
             method: 'PUT',
-            body: JSON.stringify(this.customerForm)
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(customerData)
           });
         } else {
           await api.fetchData('/customers', {
             method: 'POST',
-            body: JSON.stringify(this.customerForm)
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(customerData)
           });
         }
         await this.loadCustomers();
