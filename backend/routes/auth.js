@@ -3,7 +3,7 @@
 // Import required modules
 const express = require('express'); // Express framework for handling routes
 const jwt = require('jsonwebtoken'); // JSON Web Token library for authentication
-const bcrypt = require('bcryptjs'); // Library for hashing passwords securely
+// const bcrypt = require('bcryptjs'); // Library for hashing passwords securely
 const dotenv = require('dotenv'); // Environment variable management
 const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddleware'); // Middleware for token validation
 
@@ -13,8 +13,8 @@ const router = express.Router(); // Create an Express router
 
 // Temporary mock user data (to be replaced with database connection later)
 const users = [
-    { username: 'admin', password: '', isAdmin: true }, // Placeholder admin
-    { username: 'user', password: '', isAdmin: false } // Placeholder non-admin
+    { username: 'admin', password: 'admin123', isAdmin: true }, // Placeholder admin
+    { username: 'user', password: 'user123', isAdmin: false } // Placeholder non-admin
 ];
 
 /**
@@ -30,9 +30,13 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ message: 'Username and password are required' }); // Validate input
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password with bcrypt
-    users.push({ username, password: hashedPassword, isAdmin: isAdmin || false }); // Store user data with role
-    res.status(201).json({ message: 'User registered successfully' }); // Respond with success
+    const existingUser = users.find(us => u.username === username);
+    if (existingUser) {
+        return res.status(409).json({ message: 'User already exists'});
+    }
+
+    users.push({ username, password, isAdmin: isAdmin || false});
+    res.status(201).json({ message: 'User registered successfully'});
 });
 
 /**
@@ -46,7 +50,7 @@ router.post('/login', async (req, res) => {
     const { username, password } = req.body;
     const user = users.find(u => u.username === username);
     
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user || password !== user.password) {
         return res.status(401).json({ message: 'Invalid credentials' }); // Validate password
     }
 

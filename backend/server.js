@@ -3,11 +3,13 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const apiRoutes = require('./routes/inventory.js')
+const authRoutes = require('./routes/auth.js')
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/api', apiRoutes);
+app.use('/api/auth', authRoutes)
 
 // Create connection pool (this is not being loaded, consider changing)
 const pool = mysql.createPool({
