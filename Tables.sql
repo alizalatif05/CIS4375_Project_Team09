@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS Inventory (
     SKU_Number INT PRIMARY KEY AUTO_INCREMENT,
     ItemName VARCHAR(255) NOT NULL,
     Item_Desc TEXT,
-    Item_Quantity INT NOT NULL CHECK (Item_Quantity >= 0),
+    Item_Quantity INT NOT NULL,
     Deleted ENUM('Yes', 'No') DEFAULT 'No'
 );
 
