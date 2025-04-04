@@ -45,9 +45,9 @@
   
             // Redirect based on role
             if (this.username === 'admin') {
-              this.$router.push('/inventory');
+              this.$router.push('/home');
             } else {
-              this.$router.push('/orders');
+              this.$router.push('/home');
             }
           } else {
             this.errorMessage = 'Invalid login credentials';
