@@ -1,5 +1,5 @@
-// services/api.js
-// Simplified API service with essential functionality
+// Updated api.js with fixed endpoints
+// Replace your current api.js content with this
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -26,6 +26,7 @@ export default {
     };
 
     try {
+      console.log(`Making API request to: ${url}`);
       const response = await fetch(url, options);
 
       if (!response.ok) {
@@ -53,24 +54,36 @@ export default {
 
   // --------- USERS ---------
   async getUsers() {
-    return this.fetchData('/users');
+    // Try both endpoints since there's a discrepancy
+    try {
+      return await this.fetchData('/user'); // Use singular endpoint as in your backend route
+    } catch (error) {
+      console.log('Trying plural endpoint...');
+      return await this.fetchData('/users');
+    }
   },
 
   async getUser(id) {
-    return this.fetchData(`/users/${id}`);
+    return this.fetchData(`/user/${id}`); // Changed to match your backend route
   },
 
   async createUser(userData) {
-    return this.fetchData('/users', {
+    return this.fetchData('/user', { // Changed to match your backend route
       method: 'POST',
       body: JSON.stringify(userData)
     });
   },
 
   async updateUser(id, userData) {
-    return this.fetchData(`/users/${id}`, {
+    return this.fetchData(`/users/${id}`, { // This one uses plural in your backend
       method: 'PUT',
       body: JSON.stringify(userData)
+    });
+  },
+
+  async deleteUser(id) {
+    return this.fetchData(`/users/${id}`, { // This one uses plural in your backend
+      method: 'DELETE'
     });
   },
 
@@ -97,6 +110,12 @@ export default {
     });
   },
 
+  async deleteTechnician(id) {
+    return this.fetchData(`/technicians/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   // --------- SALES REPS ---------
   async getSalesReps() {
     return this.fetchData('/sales_reps');
@@ -117,6 +136,12 @@ export default {
     return this.fetchData(`/sales_reps/${id}`, {
       method: 'PUT',
       body: JSON.stringify(repData)
+    });
+  },
+
+  async deleteSalesRep(id) {
+    return this.fetchData(`/sales_reps/${id}`, {
+      method: 'DELETE'
     });
   },
 
@@ -173,6 +198,7 @@ export default {
       
       if (data && data.token) {
         localStorage.setItem('token', data.token);
+        console.log('Token saved to localStorage:', data.token.substring(0, 20) + '...');
       }
       
       return data;
@@ -181,11 +207,31 @@ export default {
     }
   },
   
+  async adminLogin(credentials) {
+    try {
+      const data = await this.fetchData('/auth/admin-login', {
+        method: 'POST',
+        body: JSON.stringify(credentials)
+      });
+      
+      if (data && data.token) {
+        localStorage.setItem('token', data.token);
+        console.log('Admin token saved to localStorage:', data.token.substring(0, 20) + '...');
+      }
+      
+      return data;
+    } catch (error) {
+      throw new Error('Admin login failed: ' + error.message);
+    }
+  },
+  
   logout() {
     localStorage.removeItem('token');
+    console.log('Token removed from localStorage');
   },
   
   isAuthenticated() {
-    return !!localStorage.getItem('token');
+    const token = localStorage.getItem('token');
+    return !!token;
   }
 };

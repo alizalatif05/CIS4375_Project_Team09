@@ -1,78 +1,82 @@
 // middleware/authMiddleware.js
 
-// Import required modules
-const jwt = require('jsonwebtoken'); // JSON Web Token library for authentication
-const dotenv = require('dotenv'); // Environment variable management
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+const pool = require('../db'); // Import the database connection
 
-dotenv.config(); // Load environment variables from .env file
+dotenv.config();
 
-// test user for development only
-const authenticateUser = (req, res, next) => {
-    req.user = {
-        id: 1,
-        username: 'test_user',
-        isAdmin: true,
-        role: 'admin'
-    };
+// Authenticate any logged-in user (admin or regular)
+const authenticateUser = async (req, res, next) => {
+    const token = req.header('Authorization');
+    
+    if (!token) {
+        return res.status(401).json({ message: 'Authentication required. No token provided.' });
+    }
 
-console.log('This is a test user, please replace before deployment.')
-
-next();
+    try {
+        // Remove 'Bearer ' if it's present
+        const actualToken = token.startsWith('Bearer ') ? token.slice(7) : token;
+        
+        // Verify the token
+        const decoded = jwt.verify(actualToken, process.env.JWT_SECRET || 'fallback_secret');
+        
+        // Look up the user in the database to confirm they exist and get current status
+        const [users] = await pool.query(
+            'SELECT UserID, Username, UserType, Deleted FROM user WHERE UserID = ?', 
+            [decoded.userId]
+        );
+        
+        // Check if user exists and is not deleted
+        if (users.length === 0 || users[0].Deleted === 'Yes') {
+            return res.status(401).json({ message: 'User not found or deactivated' });
+        }
+        
+        // Set the user object with current database values
+        req.user = {
+            userId: users[0].UserID,
+            username: users[0].Username,
+            isAdmin: users[0].UserType.toLowerCase() === 'admin',
+            userType: users[0].UserType
+        };
+        
+        next();
+    } catch (err) {
+        console.error('Token verification error:', err);
+        
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Token expired' });
+        }
+        
+        res.status(401).json({ message: 'Invalid token' });
+    }
 };
 
-/**
- * Middleware function to authenticate users via JWT.
- *
- * This function checks for the presence of a JWT token in the request header.
- * If the token is valid, it decodes the token and attaches the user information to the request object.
- * If invalid or missing, an appropriate error response is sent back.
- *
- * @param {Object} req - The request object.
- * @param {Object} res - The response object.
- * @param {Function} next - Callback function to pass control to the next middleware.
- */
-
-// ACUTAL AUTH LOGIC BELOW
-// const authenticateUser = (req, res, next) => {
-//     const token = req.header('Authorization'); // Get token from request header
-//     if (!token) {
-//         return res.status(401).json({ message: 'Access denied. No token provided.' }); // If no token, deny access
-//     }
-
-//     try {
-//         const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify the token using the secret key
-//         req.user = decoded; // Attach decoded user data to request
-//         next(); // Move to the next middleware or route handler
-//     } catch (err) {
-//         res.status(400).json({ message: 'Invalid token' }); // If token is invalid, return error response
-//     }
-// };
-
-/**
- * Middleware function to authorize admin users only.
- *
- * This function checks if the authenticated user has admin privileges.
- * If the user is not an admin, access is denied.
- *
- * @param {Object} req - The request object.
- * @param {Object} res - The response object.
- * @param {Function} next - Callback function to pass control to the next middleware.
- */
-
-//Test auth
-
+// Middleware to restrict access to admin-only routes
 const authorizeAdmin = (req, res, next) => {
-    console.log('Authorization in test mode.')
+    if (!req.user || !req.user.isAdmin) {
+        return res.status(403).json({ 
+            message: 'Access denied. Admin privileges required.' 
+        });
+    }
+    
     next();
 };
 
+// Middleware that checks if the user is an admin and sets an isAdmin flag
+// but allows the request to continue regardless of user type
+const checkAdmin = (req, res, next) => {
+    // req.user is already set by authenticateUser middleware
+    // We just need to make sure isAdmin flag is passed along correctly
+    
+    // You could add additional logging here if needed
+    // console.log(`User ${req.user.username} accessing path ${req.path} with admin status: ${req.user.isAdmin}`);
+    
+    next();
+};
 
-//ACTUAL LOGIC BELOW
-// const authorizeAdmin = (req, res, next) => {
-//     if (!req.user.isAdmin) {
-//         return res.status(403).json({ message: 'Access denied. Admins only.' }); // If not admin, deny access
-//     }
-//     next(); // Allow admin to proceed
-// };
-
-module.exports = { authenticateUser, authorizeAdmin }; // Export both middleware functions
+module.exports = { 
+    authenticateUser, 
+    authorizeAdmin,
+    checkAdmin
+};

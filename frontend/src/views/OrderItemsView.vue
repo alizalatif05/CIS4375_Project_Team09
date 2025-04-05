@@ -174,7 +174,7 @@
 
 <script>
 import "@/assets/css/style.css";
-import api from '../../../backend/services/api.js';
+import api from '../../services/api.js';
 
 export default {
   data() {

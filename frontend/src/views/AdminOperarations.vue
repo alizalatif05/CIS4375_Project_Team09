@@ -1,6 +1,6 @@
 <template>
   <div class="admin-page">
-    <h1>Admin Operations</h1>
+    <h1>Admin Dashboard</h1>
 
     <div class="connection-status" v-if="connectionStatus">
       <span :class="connectionStatusClass">{{ connectionStatusMessage }}</span>
@@ -302,9 +302,10 @@
 
 <script>
 import "@/assets/css/style.css";
-import api from '../../../backend/services/api.js';
+import api from '../../services/api.js';
 
 export default {
+  
   data() {
     return {
       activeTab: 'technicians',
@@ -380,257 +381,264 @@ export default {
     this.checkApiConnection();
     this.loadData();
   },
-  methods: {
-    // API connection check
-    async checkApiConnection() {
-      try {
-        const result = await api.testConnection();
-        this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
+  // Updated methods for AdminOperations.vue
+// Replace the methods section in your AdminOperations.vue file
 
-        if (this.connectionStatus === 'connected') {
-          setTimeout(() => {
-            this.connectionStatus = null;
-          }, 3000);
-        }
-      } catch (error) {
-        this.connectionStatus = 'error';
-        console.error('API connection test failed:', error);
+methods: {
+  // API connection check
+  async checkApiConnection() {
+    try {
+      const result = await api.testConnection();
+      this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
+      console.log('API connection status:', this.connectionStatus);
+
+      if (this.connectionStatus === 'connected') {
+        setTimeout(() => {
+          this.connectionStatus = null;
+        }, 3000);
       }
-    },
-
-    // Load all data
-    async loadData() {
-      await this.loadUsers();
-      await this.loadTechnicians();
-      await this.loadSalesReps();
-    },
-
-    // User methods
-    async loadUsers() {
-      this.loading.users = true;
-      this.error.users = null;
-      try {
-        this.users = await api.getUsers();
-      } catch (error) {
-        console.error('Error loading users:', error);
-        this.error.users = `Failed to load users: ${error.message}`;
-      } finally {
-        this.loading.users = false;
-      }
-    },
-
-
-    editUser(user) {
-      this.editingUser = user;
-      this.userForm = {
-        User_fName: user.User_fName,
-        User_lName: user.User_lName,
-        Username: user.Username,
-        UserPassword: '', // Don't pre-fill password
-        UserType: user.UserType,
-        Deleted: user.Deleted
-      };
-      this.showUserCreateForm = true;
-    },
-
-    async saveUser() {
-      try {
-        // Prepare user data with correct field names
-        const userData = {
-          User_fName: this.userForm.User_fName,
-          User_lName: this.userForm.User_lName,
-          Username: this.userForm.Username,
-          UserPassword: this.userForm.UserPassword,
-          UserType: this.userForm.UserType,
-          Deleted: this.userForm.Deleted
-        };
-
-        if (this.editingUser) {
-          // Remove password if empty to avoid updating with empty string
-          if (!userData.UserPassword) {
-            const { UserPassword, ...updateData } = userData;
-            await api.updateUser(this.editingUser.UserID, updateData);
-          } else {
-            await api.updateUser(this.editingUser.UserID, userData);
-          }
-        } else {
-          await api.createUser(userData);
-        }
-        await this.loadUsers();
-        this.cancelUserForm();
-      } catch (error) {
-        console.error('Error saving user:', error);
-        alert(`Error saving user: ${error.message}`);
-      }
-    },
-
-    async deleteUser(userId) {
-      if (confirm('Are you sure you want to delete this user?')) {
-        try {
-          await api.fetchData(`/users/${userId}`, {
-            method: 'DELETE'
-          });
-          await this.loadUsers();
-        } catch (error) {
-          console.error('Error deleting user:', error);
-          alert(`Error deleting user: ${error.message}`);
-        }
-      }
-    },
-
-    cancelUserForm() {
-      this.editingUser = null;
-      this.showUserCreateForm = false;
-      this.userForm = {
-        User_fName: '',
-        User_lName: '',
-        Username: '',
-        UserPassword: '',
-        UserType: 'standard',
-        Deleted: 'No'
-      };
-    },
-
-    // Technician methods
-    async loadTechnicians() {
-      this.loading.technicians = true;
-      this.error.technicians = null;
-      try {
-        this.technicians = await api.getTechnicians();
-      } catch (error) {
-        console.error('Error loading technicians:', error);
-        this.error.technicians = `Failed to load technicians: ${error.message}`;
-      } finally {
-        this.loading.technicians = false;
-      }
-    },
-
-    editTechnician(tech) {
-      this.editingTech = tech;
-      this.techForm = {
-        firstName: tech.firstName,
-        lastName: tech.lastName,
-        UserID: tech.UserID,
-        Deleted: tech.Deleted
-      };
-      this.showTechCreateForm = true;
-    },
-
-    async saveTechnician() {
-      try {
-        const techData = {
-          Tech_fName: this.techForm.firstName,
-          Tech_lName: this.techForm.lastName,
-          UserID: this.techForm.UserID || null,
-          Deleted: this.techForm.Deleted
-        };
-
-        if (this.editingTech) {
-          await api.updateTechnician(this.editingTech.TechID, techData);
-        } else {
-          await api.createTechnician(techData);
-        }
-        await this.loadTechnicians();
-        this.cancelTechForm();
-      } catch (error) {
-        console.error('Error saving technician:', error);
-        alert(`Error saving technician: ${error.message}`);
-      }
-    },
-
-    async deleteTechnician(techId) {
-      if (confirm('Are you sure you want to delete this technician?')) {
-        try {
-          await api.fetchData(`/technicians/${techId}`, {
-            method: 'DELETE'
-          });
-          await this.loadTechnicians();
-        } catch (error) {
-          console.error('Error deleting technician:', error);
-          alert(`Error deleting technician: ${error.message}`);
-        }
-      }
-    },
-
-    cancelTechForm() {
-      this.editingTech = null;
-      this.showTechCreateForm = false;
-      this.techForm = {
-        firstName: '',
-        lastName: '',
-        UserID: '',
-        Deleted: 'No'
-      };
-    },
-
-    // Sales Rep methods
-    async loadSalesReps() {
-      this.loading.salesReps = true;
-      this.error.salesReps = null;
-      try {
-        this.salesReps = await api.getSalesReps();
-      } catch (error) {
-        console.error('Error loading sales reps:', error);
-        this.error.salesReps = `Failed to load sales reps: ${error.message}`;
-      } finally {
-        this.loading.salesReps = false;
-      }
-    },
-
-    editSalesRep(rep) {
-      this.editingRep = rep;
-      this.repForm = {
-        SalesRep_fName: rep.SalesRep_fName,
-        SalesRep_lName: rep.SalesRep_lName,
-        UserID: rep.UserID
-      };
-      this.showRepCreateForm = true;
-    },
-
-    async saveSalesRep() {
-      try {
-        const repData = {
-          SalesRep_fName: this.repForm.SalesRep_fName,
-          SalesRep_lName: this.repForm.SalesRep_lName,
-          UserID: this.repForm.UserID || null
-        };
-
-        if (this.editingRep) {
-          await api.updateSalesRep(this.editingRep.SalesRepID, repData);
-        } else {
-          await api.createSalesRep(repData);
-        }
-        await this.loadSalesReps();
-        this.cancelRepForm();
-      } catch (error) {
-        console.error('Error saving sales rep:', error);
-        alert(`Error saving sales rep: ${error.message}`);
-      }
-    },
-
-    async deleteSalesRep(repId) {
-      if (confirm('Are you sure you want to delete this sales rep?')) {
-        try {
-          await api.fetchData(`/sales_reps/${repId}`, {
-            method: 'DELETE'
-          });
-          await this.loadSalesReps();
-        } catch (error) {
-          console.error('Error deleting sales rep:', error);
-          alert(`Error deleting sales rep: ${error.message}`);
-        }
-      }
-    },
-
-    cancelRepForm() {
-      this.editingRep = null;
-      this.showRepCreateForm = false;
-      this.repForm = {
-        SalesRep_fName: '',
-        SalesRep_lName: '',
-        UserID: ''
-      };
+    } catch (error) {
+      this.connectionStatus = 'error';
+      console.error('API connection test failed:', error);
     }
+  },
+
+  // Load all data
+  async loadData() {
+    await this.loadUsers();
+    await this.loadTechnicians();
+    await this.loadSalesReps();
+  },
+
+  // User methods
+  async loadUsers() {
+    this.loading.users = true;
+    this.error.users = null;
+    try {
+      console.log('Loading users...');
+      this.users = await api.getUsers();
+      console.log('Users loaded:', this.users.length);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      this.error.users = `Failed to load users: ${error.message}`;
+    } finally {
+      this.loading.users = false;
+    }
+  },
+
+  // Technician methods
+  async loadTechnicians() {
+    this.loading.technicians = true;
+    this.error.technicians = null;
+    try {
+      console.log('Loading technicians...');
+      this.technicians = await api.getTechnicians();
+      console.log('Technicians loaded:', this.technicians.length);
+    } catch (error) {
+      console.error('Error loading technicians:', error);
+      this.error.technicians = `Failed to load technicians: ${error.message}`;
+    } finally {
+      this.loading.technicians = false;
+    }
+  },
+
+  // Sales Rep methods
+  async loadSalesReps() {
+    this.loading.salesReps = true;
+    this.error.salesReps = null;
+    try {
+      console.log('Loading sales reps...');
+      this.salesReps = await api.getSalesReps();
+      console.log('Sales reps loaded:', this.salesReps.length);
+    } catch (error) {
+      console.error('Error loading sales reps:', error);
+      this.error.salesReps = `Failed to load sales reps: ${error.message}`;
+    } finally {
+      this.loading.salesReps = false;
+    }
+  },
+
+  // The rest of your existing methods...
+  editUser(user) {
+    this.editingUser = user;
+    this.userForm = {
+      User_fName: user.User_fName,
+      User_lName: user.User_lName,
+      Username: user.Username,
+      UserPassword: '', // Don't pre-fill password
+      UserType: user.UserType,
+      Deleted: user.Deleted
+    };
+    this.showUserCreateForm = true;
+  },
+
+  async saveUser() {
+    try {
+      // Prepare user data with correct field names
+      const userData = {
+        User_fName: this.userForm.User_fName,
+        User_lName: this.userForm.User_lName,
+        Username: this.userForm.Username,
+        UserPassword: this.userForm.UserPassword,
+        UserType: this.userForm.UserType,
+        Deleted: this.userForm.Deleted
+      };
+
+      if (this.editingUser) {
+        // Remove password if empty to avoid updating with empty string
+        if (!userData.UserPassword) {
+          const { UserPassword, ...updateData } = userData;
+          await api.updateUser(this.editingUser.UserID, updateData);
+        } else {
+          await api.updateUser(this.editingUser.UserID, userData);
+        }
+      } else {
+        await api.createUser(userData);
+      }
+      await this.loadUsers();
+      this.cancelUserForm();
+    } catch (error) {
+      console.error('Error saving user:', error);
+      alert(`Error saving user: ${error.message}`);
+    }
+  },
+
+  async deleteUser(userId) {
+    if (confirm('Are you sure you want to delete this user?')) {
+      try {
+        await api.deleteUser(userId);
+        await this.loadUsers();
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert(`Error deleting user: ${error.message}`);
+      }
+    }
+  },
+
+  cancelUserForm() {
+    this.editingUser = null;
+    this.showUserCreateForm = false;
+    this.userForm = {
+      User_fName: '',
+      User_lName: '',
+      Username: '',
+      UserPassword: '',
+      UserType: 'standard',
+      Deleted: 'No'
+    };
+  },
+
+  editTechnician(tech) {
+    this.editingTech = tech;
+    this.techForm = {
+      firstName: tech.firstName,
+      lastName: tech.lastName,
+      UserID: tech.UserID,
+      Deleted: tech.Deleted || 'No'
+    };
+    this.showTechCreateForm = true;
+  },
+
+  async saveTechnician() {
+    try {
+      const techData = {
+        Tech_fName: this.techForm.firstName,
+        Tech_lName: this.techForm.lastName,
+        UserID: this.techForm.UserID || null,
+        Deleted: this.techForm.Deleted || 'No'
+      };
+
+      if (this.editingTech) {
+        await api.updateTechnician(this.editingTech.TechID, techData);
+      } else {
+        await api.createTechnician(techData);
+      }
+      await this.loadTechnicians();
+      this.cancelTechForm();
+    } catch (error) {
+      console.error('Error saving technician:', error);
+      alert(`Error saving technician: ${error.message}`);
+    }
+  },
+
+  async deleteTechnician(techId) {
+    if (confirm('Are you sure you want to delete this technician?')) {
+      try {
+        await api.deleteTechnician(techId);
+        await this.loadTechnicians();
+      } catch (error) {
+        console.error('Error deleting technician:', error);
+        alert(`Error deleting technician: ${error.message}`);
+      }
+    }
+  },
+
+  cancelTechForm() {
+    this.editingTech = null;
+    this.showTechCreateForm = false;
+    this.techForm = {
+      firstName: '',
+      lastName: '',
+      UserID: '',
+      Deleted: 'No'
+    };
+  },
+
+  editSalesRep(rep) {
+    this.editingRep = rep;
+    this.repForm = {
+      SalesRep_fName: rep.SalesRep_fName,
+      SalesRep_lName: rep.SalesRep_lName,
+      UserID: rep.UserID,
+      Deleted: rep.Deleted || 'No'
+    };
+    this.showRepCreateForm = true;
+  },
+
+  async saveSalesRep() {
+    try {
+      const repData = {
+        SalesRep_fName: this.repForm.SalesRep_fName,
+        SalesRep_lName: this.repForm.SalesRep_lName,
+        UserID: this.repForm.UserID || null,
+        Deleted: this.repForm.Deleted || 'No'
+      };
+
+      if (this.editingRep) {
+        await api.updateSalesRep(this.editingRep.SalesRepID, repData);
+      } else {
+        await api.createSalesRep(repData);
+      }
+      await this.loadSalesReps();
+      this.cancelRepForm();
+    } catch (error) {
+      console.error('Error saving sales rep:', error);
+      alert(`Error saving sales rep: ${error.message}`);
+    }
+  },
+
+  async deleteSalesRep(repId) {
+    if (confirm('Are you sure you want to delete this sales rep?')) {
+      try {
+        await api.deleteSalesRep(repId);
+        await this.loadSalesReps();
+      } catch (error) {
+        console.error('Error deleting sales rep:', error);
+        alert(`Error deleting sales rep: ${error.message}`);
+      }
+    }
+  },
+
+  cancelRepForm() {
+    this.editingRep = null;
+    this.showRepCreateForm = false;
+    this.repForm = {
+      SalesRep_fName: '',
+      SalesRep_lName: '',
+      UserID: '',
+      Deleted: 'No'
+    };
   }
+}
 };
 </script>
