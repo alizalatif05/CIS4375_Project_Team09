@@ -1,11 +1,14 @@
 <template>
+
   <div class="admin-page">
     <h1>Admin Dashboard</h1>
 
+    <!--Checks connection status-->
     <div class="connection-status" v-if="connectionStatus">
       <span :class="connectionStatusClass">{{ connectionStatusMessage }}</span>
     </div>
 
+    <!-- 3 tabs -->
     <div class="tabs">
       <button
         :class="{ active: activeTab === 'technicians' }"
@@ -192,15 +195,14 @@
       </div>
     </div>
 
-    <!-- Users Tab -->
-  <!-- Update the Users Tab section -->
-<div v-if="activeTab === 'users'" class="tab-content">
+  <!-- Users Tab Heading-->
+  <div v-if="activeTab === 'users'" class="tab-content">
   <div class="actions">
     <button @click="showUserCreateForm = true" class="create-btn">
       Add New User
     </button>
     
-    <!-- Add filter controls -->
+    
     <div class="filter-controls">
       <label class="filter-label">
         <input type="checkbox" v-model="showInactiveUsers" @change="applyUserFilters">
@@ -216,7 +218,8 @@
       </div>
     </div>
   </div>
-<!--User Tab-->
+
+  <!--User Tab-->
   <div class="data-table">
     <h2>Users</h2>
     <div v-if="loading.users" class="loading">Loading users...</div>
@@ -339,7 +342,7 @@ export default {
       activeTab: 'technicians',
       connectionStatus: null,
 
-      showInactiveUsers: true, // Show inactive users along with active
+      showInactiveUsers: true, // Show inactive users along with active (for admins only)
       userSearchQuery: '',
       filteredUsers: [],
 
@@ -413,8 +416,6 @@ export default {
     this.checkApiConnection();
     this.loadData();
   },
-  // Updated methods for AdminOperations.vue
-// Replace the methods section in your AdminOperations.vue file
 
 methods: {
   // API connection check
@@ -448,7 +449,6 @@ methods: {
   this.error.users = null;
   try {
     console.log('Loading users...');
-    // Get all users, including inactive ones
     this.users = await api.getUsers();
     console.log('Users loaded:', this.users.length);
     
@@ -462,7 +462,7 @@ methods: {
   }
 },
 
-  // User filtering and toggling methods
+  // User filtering and toggling 
 applyUserFilters() {
   if (!this.users) {
     this.filteredUsers = [];
@@ -512,7 +512,7 @@ async toggleUserStatus(user) {
     console.error('Error toggling user status:', error);
     alert(`Error changing user status: ${error.message}`);
     
-    // Revert the visual change
+  // Revert the visual change
     this.loadUsers();
   }
 },
@@ -549,14 +549,14 @@ async toggleUserStatus(user) {
     }
   },
 
-  // The rest of your existing methods...
+  
   editUser(user) {
     this.editingUser = user;
     this.userForm = {
       User_fName: user.User_fName,
       User_lName: user.User_lName,
       Username: user.Username,
-      UserPassword: '', // Don't pre-fill password
+      UserPassword: '', 
       UserType: user.UserType,
       Deleted: user.Deleted
     };
@@ -565,7 +565,6 @@ async toggleUserStatus(user) {
 
   async saveUser() {
     try {
-      // Prepare user data with correct field names
       const userData = {
         User_fName: this.userForm.User_fName,
         User_lName: this.userForm.User_lName,
@@ -576,7 +575,6 @@ async toggleUserStatus(user) {
       };
 
       if (this.editingUser) {
-        // Remove password if empty to avoid updating with empty string
         if (!userData.UserPassword) {
           const { UserPassword, ...updateData } = userData;
           await api.updateUser(this.editingUser.UserID, updateData);
@@ -736,7 +734,6 @@ async toggleUserStatus(user) {
 
 
 <style scoped>
-/* Add these styles to your component */
 
 /* Filter controls */
 .filter-controls {

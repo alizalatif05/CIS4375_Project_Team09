@@ -7,20 +7,15 @@
     </div>
 
     <div class="tabs">
-      <button
-        :class="{ active: activeTab === 'inventory' }"
-        @click="activeTab = 'inventory'"
-      >
+      <button :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">
         Inventory
       </button>
-      <button
-        :class="{ active: activeTab === 'technicianInventory' }"
-        @click="activeTab = 'technicianInventory'"
-      >
+      <button :class="{ active: activeTab === 'technicianInventory' }" @click="activeTab = 'technicianInventory'">
         Technician Inventory
       </button>
     </div>
-    <!--Inventory tab-->
+
+    <!--Add inventory tab-->
     <div v-if="activeTab === 'inventory'" class="tab-content">
       <div class="actions">
         <button @click="showInventoryCreateForm = true" class="create-btn">
@@ -264,7 +259,7 @@
        </div>
     </div>
 
-  <!--Inventory Create form-->
+  <!--Inventory Create Form-->
     <div v-if="showTechInventoryCreateForm" class="modal">
         <div class="modal-content">
           <div class="modal-header">
@@ -351,7 +346,7 @@ export default {
       showInventoryCreateForm: false,
 
  
-      // Forms for Inventory Tab (Kept)
+      // Forms for Inventory Tab
       inventoryForm: {
         ItemName: '',
         Item_Desc: '',
@@ -407,7 +402,7 @@ export default {
     this.loadData(); // Load all necessary data
   },
   methods: {
-    // API connection check (keep as is)
+    // API connection check
     async checkApiConnection() {
       try {
         const result = await api.testConnection();
@@ -433,12 +428,12 @@ export default {
        this.filterInventoryItems();
     },
 
-    // --- Inventory Tab Methods (Kept UNCHANGED) ---
+    // --- Inventory Tab Methods ---
     async loadInventory() {
       this.loading.inventory = true;
       this.error.inventory = null;
       try {
-        this.inventory = await api.getInventory(); // Assumes api.js has getInventory
+        this.inventory = await api.getInventory(); 
         console.log("Inventory loaded:", this.inventory.length, "items");
       } catch (error) {
         console.error('Error loading inventory:', error);
@@ -454,7 +449,7 @@ export default {
     },
     editInventory(item) {
       this.selectedInventory = null;
-      this.editingInventory = { ...item }; // Use spread to avoid direct mutation
+      this.editingInventory = { ...item }; 
       this.inventoryForm = { ...item };
       this.showInventoryCreateForm = true;
     },
@@ -476,14 +471,12 @@ export default {
         };
 
         if (this.editingInventory) {
-           // Make sure SKU_Number is correctly referenced if needed in the payload or URL
           await api.fetchData(`/inventory/${this.editingInventory.SKU_Number}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload) // Send standardized payload
           });
         } else {
-          // Adjust payload keys if POST expects different names
           const postPayload = {
               itemName: this.inventoryForm.ItemName,
               itemDesc: this.inventoryForm.Item_Desc,
@@ -495,8 +488,8 @@ export default {
             body: JSON.stringify(postPayload)
           });
         }
-        await this.loadInventory(); // Reload inventory list
-        this.cancelInventoryForm(); // Close form
+        await this.loadInventory(); 
+        this.cancelInventoryForm(); 
       } catch (error) {
         console.error('Error saving inventory:', error);
         alert(`Error saving inventory: ${error?.message || error}`);
@@ -519,14 +512,12 @@ export default {
       this.selectedInventory = null; // Ensure details modal also closes
       this.inventoryForm = { ItemName: '', Item_Desc: '', Item_Quantity: 0 }; // Reset form
     },
-    // --- End Inventory Tab Methods ---
 
-    // --- Technician Inventory Methods (Modified) ---
+    // --- Technician Inventory Methods ---
     async loadTechnicianInventory() {
       this.loading.technicianInventory = true;
       this.error.technicianInventory = null;
       try {
-        // API MUST return Quantity along with other fields
         this.technicianInventory = await api.fetchData('/techinventory');
         console.log("Tech inventory loaded:", this.technicianInventory.length, "items");
       } catch (error) {
@@ -541,7 +532,7 @@ export default {
       this.loading.technicians = true;
       this.error.technicians = null;
       try {
-        this.technicians = await api.getTechnicians(); // Assumes api.js has getTechnicians
+        this.technicians = await api.getTechnicians(); 
         console.log("Technicians loaded:", this.technicians.length);
       } catch (error) {
         console.error('Error loading technicians:', error);
@@ -550,8 +541,6 @@ export default {
         this.loading.technicians = false;
       }
     },
-
-    // Removed: editTechInventory, saveTechInventory, deleteTechInventory, cancelTechInventoryForm
 
     editTechInventory(techItem) {
       this.editingTechInventory = techItem;
@@ -626,7 +615,6 @@ export default {
     async deleteTechInventory(sku, techId) {
       if (confirm('Are you sure you want to remove this assignment?')) {
         try {
-          // Note: You'll need to implement this endpoint in your backend
           await api.fetchData(`/techinventory/${sku}/${techId}`, {
             method: 'DELETE'
           });

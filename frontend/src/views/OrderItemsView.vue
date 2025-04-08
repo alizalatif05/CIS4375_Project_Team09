@@ -384,7 +384,7 @@ export default {
       }
     },
 
-    // Fetches the detailed items (including quantity) for a specific order from the API.
+    // Fetches the detailed items (including quantity) for a specific order from the API. ERROR HERE
     async loadOrderItems(orderID) {
       this.loading.orderItems = true;
       this.error.orderItems = null;
