@@ -622,8 +622,8 @@ async toggleUserStatus(user) {
   editTechnician(tech) {
     this.editingTech = tech;
     this.techForm = {
-      firstName: tech.firstName,
-      lastName: tech.lastName,
+      firstName: tech.Tech_fName,
+      lastName: tech.Tech_lName,
       UserID: tech.UserID,
       Deleted: tech.Deleted || 'No'
     };

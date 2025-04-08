@@ -158,12 +158,12 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
             updates.push('QTY = ?');
             values.push(quantity);
         }
-        
-        // Add new SKU if provided
-        if (newSkuNumber) {
-            updates.push('SKU_Number = ?');
-            values.push(newSkuNumber);
-        }
+        //This may cause an error
+        // // Add new SKU if provided
+        // if (newSkuNumber) {
+        //     updates.push('SKU_Number = ?');
+        //     values.push(newSkuNumber);
+        // }
         
         // Add new tech ID if provided
         if (newTechId) {
@@ -832,14 +832,14 @@ router.delete('/customers/:id', authenticateUser, async (req, res) => {
  */
 router.post('/techinventory', authenticateUser, async (req, res) => {
     // 'quantity' from the request now represents the amount to ADD or the initial amount
-    const { skuNumber, techId, quantity } = req.body;
+    const { skuNumber, techId, QTY } = req.body;
 
     if (!skuNumber || !techId) {
         return res.status(400).json({ message: 'SKU Number and Technician ID are required' });
     }
 
     // Validate the quantity being added/assigned in this request
-    const quantityToAddOrAssign = parseInt(quantity);
+    const quantityToAddOrAssign = parseInt(QTY);
     if (isNaN(quantityToAddOrAssign) || quantityToAddOrAssign < 1) {
         return res.status(400).json({ message: 'Quantity must be a positive number' });
     }
@@ -893,7 +893,7 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
             } else {
                 // --- MODIFIED LOGIC FOR ACTIVE ASSIGNMENT ---
                 // Already Active: ADD the requested quantity ('quantityToAddOrAssign') to the existing quantity.
-                 const currentQty = existing.Quantity;
+                 const currentQty = existing.QTY;
 
                  // Calculate the new total quantity
                  const newTotalQty = currentQty + quantityToAddOrAssign;
@@ -1026,7 +1026,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
 
           // Update TechInventory quantity
           await connection.query(
-              'UPDATE TechInventory SET Quantity = ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+              'UPDATE TechInventory SET QTY= ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
               [qty, oldSku, oldTechId]
           );
 
@@ -1077,7 +1077,7 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
 
         // 2. Soft delete the TechInventory record (set Deleted='Yes', Quantity=0)
         const [result] = await connection.query(
-            'UPDATE TechInventory SET Deleted = "Yes", Quantity = 0 WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+            'UPDATE TechInventory SET Deleted = "Yes", QTY = 0 WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
             [sku, techId]
         );
 

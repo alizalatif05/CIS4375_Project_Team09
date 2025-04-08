@@ -27,6 +27,7 @@
           Add New Inventory Item
         </button>
       </div>
+
     <!--Inventory table-->
       <div class="data-table">
         <h2>Inventory</h2>
@@ -66,6 +67,7 @@
         </table>
       </div>
 
+      <!--Inventory Form Modal-->
       <div v-if="showInventoryCreateForm || editingInventory" class="modal">
         <div class="modal-content">
           <div class="modal-header">
@@ -95,6 +97,7 @@
         </div>
       </div>
 
+      <!-- Inventory Details Modal -->
       <div v-if="selectedInventory && !showInventoryCreateForm && !editingInventory" class="modal">
          <div class="modal-content">
            <div class="modal-header">
@@ -117,6 +120,7 @@
        </div>
     </div>
 
+    <!-- Technician Inventory Tab -->
     <div v-if="activeTab === 'technicianInventory'" class="tab-content">
       <div class="actions">
         <button v-if="isAdmin" @click="showBulkAssignForm = true" class="create-btn bulk-assign-btn">
@@ -137,7 +141,9 @@
               <th>Technician ID</th>
               <th>Item Name</th>
               <th>Description</th>
-              <th>Quantity</th> </tr>
+              <th>Quantity</th>
+              <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-for="techItem in technicianInventory" :key="`${techItem.SKU_Number}-${techItem.TechID}`">
@@ -145,11 +151,21 @@
               <td>{{ techItem.TechID }}</td>
               <td>{{ techItem.ItemName }}</td>
               <td>{{ techItem.Item_Desc }}</td>
-              <td>{{ techItem.QTY }}</td> </tr>
+              <td>{{ techItem.QTY }}</td> 
+              <td>
+                <button @click="editTechInventory(techItem)" class="btn-edit">
+                  Edit
+                </button>
+                <button @click="deleteTechInventory(techItem.SKU_Number, techItem.TechID)" class="btn-delete">
+                  Remove
+                </button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
 
+      <!-- Technician Inventory Bulk Assignment -->
       <div v-if="showBulkAssignForm" class="modal">
          <div class="modal-content">
            <div class="modal-header">
@@ -247,8 +263,48 @@
          </div>
        </div>
     </div>
+
+  <!--Inventory Create form-->
+    <div v-if="showTechInventoryCreateForm" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>{{ editingTechInventory ? 'Edit Technician Assignment' : 'Assign Item to technician' }}</h3>
+            <button @click="cancelTechInventoryForm" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="saveTechInventory">
+              <div class="form-group">
+                <label>Item:</label>
+                <select v-model="techInventoryForm.SKU_Number" required>
+                  <option value="">Select an item</option>
+                  <option v-for="item in inventory" :key="item.SKU_Number" :value="item.SKU_Number">
+                    {{ item.ItemName }} ({{ item.SKU_Number }})
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Technician:</label>
+                <select v-model="techInventoryForm.TechID" required>
+                  <option value="">Select a technician</option>
+                  <option v-for="tech in technicians" :key="tech.TechID" :value="tech.TechID">
+                    {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                  <label>Quantity:</label>
+                  <input type="number" v-model.number="techInventoryForm.QTY" min="1" required />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn-save">Assign</button>
+                <button type="button" @click="cancelTechInventoryForm" class="btn-cancel">Cancel</button>
+              </div>
+            </form>
+          </div>
   </div>
-</template>
+  </div>
+  </div>
+  </template>
 
 <script>
 import "@/assets/css/style.css"; // Adjust path as needed
@@ -290,24 +346,23 @@ export default {
       // UI State for Inventory Tab (Kept)
       selectedInventory: null,
       editingInventory: null,
+      editingTechInventory: null,
+      showTechInventoryCreateForm: false,
       showInventoryCreateForm: false,
 
-      // UI State for Technician Inventory Tab (Individual form removed)
-      // editingTechInventory: null, // Removed
-      // showTechInventoryCreateForm: false, // Removed
-
+ 
       // Forms for Inventory Tab (Kept)
       inventoryForm: {
         ItemName: '',
         Item_Desc: '',
         Item_Quantity: 0
       },
+      techInventoryForm: {
+        SKU_Number: '',
+        TechID: '',
+        QTY: 1
+      }
 
-      // Forms for Technician Inventory Tab (Individual form removed)
-      // techInventoryForm: { // Removed
-      //   SKU_Number: '',
-      //   TechID: ''
-      // }
     };
   },
   computed: {
@@ -498,7 +553,103 @@ export default {
 
     // Removed: editTechInventory, saveTechInventory, deleteTechInventory, cancelTechInventoryForm
 
-    // --- Bulk Assignment Methods (Kept UNCHANGED from your code) ---
+    editTechInventory(techItem) {
+      this.editingTechInventory = techItem;
+      this.techInventoryForm = {
+        SKU_Number: techItem.SKU_Number,
+        TechID: techItem.TechID,
+        QTY: techItem.QTY,
+      };
+      this.showTechInventoryCreateForm = true;
+    },
+
+    async saveTechInventory() {
+  try {
+    if (this.editingTechInventory) {
+      // Check if SKU changed
+      if (this.techInventoryForm.SKU_Number !== this.editingTechInventory.SKU_Number ||
+          this.techInventoryForm.TechID !== this.editingTechInventory.TechID) {
+        // If primary keys (SKU or TechID) changed, we need to delete and recreate
+        
+        // First, delete the old record
+        await api.fetchData(`/techinventory/${this.editingTechInventory.SKU_Number}/${this.editingTechInventory.TechID}`, {
+          method: 'DELETE'
+        });
+        
+        // Then create a new record
+        await api.fetchData('/techinventory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            skuNumber: this.techInventoryForm.SKU_Number,
+            techId: this.techInventoryForm.TechID,
+            quantity: this.techInventoryForm.QTY
+          })
+        });
+      } else {
+        // Only updating quantity, not changing primary keys
+        await api.fetchData(`/techinventory/${this.editingTechInventory.SKU_Number}/${this.editingTechInventory.TechID}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            quantity: this.techInventoryForm.QTY
+          })
+        });
+      }
+    } else {
+      // Create new assignment
+      await api.fetchData('/techinventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          skuNumber: this.techInventoryForm.SKU_Number,
+          techId: this.techInventoryForm.TechID,
+          QTY: this.techInventoryForm.QTY
+        })
+      });
+    }
+    
+    await this.loadTechnicianInventory();
+    this.cancelTechInventoryForm();
+  } catch (error) {
+    console.error('Error saving technician inventory:', error);
+    alert(`Error saving: ${error.message || 'Unknown error'}`);
+  }
+},
+
+    async deleteTechInventory(sku, techId) {
+      if (confirm('Are you sure you want to remove this assignment?')) {
+        try {
+          // Note: You'll need to implement this endpoint in your backend
+          await api.fetchData(`/techinventory/${sku}/${techId}`, {
+            method: 'DELETE'
+          });
+          await this.loadTechnicianInventory();
+        } catch (error) {
+          console.error('Error removing assignment:', error);
+          alert(`Error removing assignment: ${error.message}`);
+        }
+      }
+    },
+
+    cancelTechInventoryForm() {
+      this.showTechInventoryCreateForm = false;
+      this.techInventoryForm = {
+        SKU_Number: '',
+        TechID: '',
+        QTY: 1
+      };
+    },
+
+
+
+    // --- Bulk Assignment Methods ---
      isItemSelected(skuNumber) {
       return this.bulkAssignForm.selectedItems.includes(skuNumber);
     },
@@ -573,6 +724,7 @@ export default {
      },
 
     async saveBulkAssignment() {
+      
       if (!this.bulkAssignForm.technicianId || this.bulkAssignForm.selectedItems.length === 0) {
         alert("Please select a technician and at least one item.");
         return;
@@ -580,11 +732,17 @@ export default {
 
       this.processingBulkAssign = true;
       const techId = this.bulkAssignForm.technicianId;
-      const itemsToAssign = this.bulkAssignForm.selectedItems.map(sku => ({
+      const itemsToAssign = this.bulkAssignForm.selectedItems.map(sku => {
+        const quantity = Number(this.bulkAssignForm.quantities[sku]) || 1;
+
+        return {
           skuNumber: sku,
           techId: techId,
-          quantity: this.bulkAssignForm.quantities[sku] || 1 // Default to 1 if somehow unset
-      }));
+          quantity: quantity // Default to 1 if somehow unset
+        };
+      });
+
+      
 
       console.log(`Starting bulk assignment of ${itemsToAssign.length} items to technician ${techId}`);
 
