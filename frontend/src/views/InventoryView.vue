@@ -20,14 +20,14 @@
         Technician Inventory
       </button>
     </div>
-
+    <!--Inventory tab-->
     <div v-if="activeTab === 'inventory'" class="tab-content">
       <div class="actions">
         <button @click="showInventoryCreateForm = true" class="create-btn">
           Add New Inventory Item
         </button>
       </div>
-
+    <!--Inventory table-->
       <div class="data-table">
         <h2>Inventory</h2>
         <div v-if="loading.inventory" class="loading">Loading inventory...</div>
@@ -119,7 +119,7 @@
 
     <div v-if="activeTab === 'technicianInventory'" class="tab-content">
       <div class="actions">
-        <button @click="showBulkAssignForm = true" class="create-btn bulk-assign-btn">
+        <button v-if="isAdmin" @click="showBulkAssignForm = true" class="create-btn bulk-assign-btn">
           Bulk Assign Items to Technician
         </button>
       </div>
@@ -145,7 +145,7 @@
               <td>{{ techItem.TechID }}</td>
               <td>{{ techItem.ItemName }}</td>
               <td>{{ techItem.Item_Desc }}</td>
-              <td>{{ techItem.Quantity }}</td> </tr>
+              <td>{{ techItem.QTY }}</td> </tr>
           </tbody>
         </table>
       </div>
@@ -257,6 +257,7 @@ import api from '../../services/api.js'; // Adjust path as needed
 export default {
   data() {
     return {
+      isAdmin: false,
       activeTab: 'inventory', // Default tab
       connectionStatus: null,
       showBulkAssignForm: false,
@@ -347,6 +348,7 @@ export default {
 
   created() {
     this.checkApiConnection();
+    this.checkAdminStatus();
     this.loadData(); // Load all necessary data
   },
   methods: {
@@ -639,6 +641,12 @@ export default {
       } finally {
         this.processingBulkAssign = false;
       }
+    },
+
+    checkAdminStatus() {
+      const isAdmin = localStorage.getItem('isAdmin') === 'true';
+      this.isAdmin = isAdmin;
+      console.log("User admin status:", this.isAdmin);
     },
 
      cancelBulkAssignForm() {

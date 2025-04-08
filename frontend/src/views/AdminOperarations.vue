@@ -193,55 +193,83 @@
     </div>
 
     <!-- Users Tab -->
-    <div v-if="activeTab === 'users'" class="tab-content">
-      <div class="actions">
-        <button @click="showUserCreateForm = true" class="create-btn">
-          Add New User
-        </button>
+  <!-- Update the Users Tab section -->
+<div v-if="activeTab === 'users'" class="tab-content">
+  <div class="actions">
+    <button @click="showUserCreateForm = true" class="create-btn">
+      Add New User
+    </button>
+    
+    <!-- Add filter controls -->
+    <div class="filter-controls">
+      <label class="filter-label">
+        <input type="checkbox" v-model="showInactiveUsers" @change="applyUserFilters">
+        Show Inactive Users
+      </label>
+      <div class="search-box">
+        <input 
+          type="text" 
+          v-model="userSearchQuery" 
+          placeholder="Search users..." 
+          @input="applyUserFilters"
+        />
       </div>
-
-      <div class="data-table">
-        <h2>Users</h2>
-        <div v-if="loading.users" class="loading">Loading users...</div>
-        <div v-else-if="error.users" class="error-message">
-          {{ error.users }}
-        </div>
-        <table v-else>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>First Name</th>
-              <th>Last Name</th>
-              <th>Username</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in users" :key="user.UserID">
-              <td>{{ user.UserID }}</td>
-              <td>{{ user.User_fName }}</td>
-              <td>{{ user.User_lName }}</td>
-              <td>{{ user.Username }}</td>
-              <td>{{ user.UserType }}</td>
-              <td>
-                <span :class="['status-badge', user.Deleted === 'No' ? 'active' : 'inactive']">
-                  {{ user.Deleted === 'No' ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td>
-                <button @click="editUser(user)" class="btn-edit">
-                  Edit
-                </button>
-                <button @click="deleteUser(user.UserID)" class="btn-delete">
-                  Delete
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    </div>
+  </div>
+<!--User Tab-->
+  <div class="data-table">
+    <h2>Users</h2>
+    <div v-if="loading.users" class="loading">Loading users...</div>
+    <div v-else-if="error.users" class="error-message">
+      {{ error.users }}
+    </div>
+    <table v-else>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Username</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="user in filteredUsers" :key="user.UserID">
+          <td>{{ user.UserID }}</td>
+          <td>{{ user.User_fName }}</td>
+          <td>{{ user.User_lName }}</td>
+          <td>{{ user.Username }}</td>
+          <td>{{ user.UserType }}</td>
+          <td>
+            <!-- Replace static badge with toggleable switch -->
+            <div class="status-toggle">
+              <label class="switch">
+                <input 
+                  type="checkbox" 
+                  :checked="user.Deleted === 'No'" 
+                  @change="toggleUserStatus(user)"
+                >
+                <span class="slider round"></span>
+              </label>
+              <span :class="['status-label', user.Deleted === 'No' ? 'active' : 'inactive']">
+                {{ user.Deleted === 'No' ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+          </td>
+          <td>
+            <button @click="editUser(user)" class="btn-edit">
+              Edit
+            </button>
+            <button @click="deleteUser(user.UserID)" class="btn-delete">
+              Delete
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
       <!-- User Form Modal -->
       <div v-if="showUserCreateForm || editingUser" class="modal">
@@ -310,6 +338,10 @@ export default {
     return {
       activeTab: 'technicians',
       connectionStatus: null,
+
+      showInactiveUsers: true, // Show inactive users along with active
+      userSearchQuery: '',
+      filteredUsers: [],
 
       // Loading and error states
       loading: {
@@ -412,19 +444,78 @@ methods: {
 
   // User methods
   async loadUsers() {
-    this.loading.users = true;
-    this.error.users = null;
-    try {
-      console.log('Loading users...');
-      this.users = await api.getUsers();
-      console.log('Users loaded:', this.users.length);
-    } catch (error) {
-      console.error('Error loading users:', error);
-      this.error.users = `Failed to load users: ${error.message}`;
-    } finally {
-      this.loading.users = false;
-    }
-  },
+  this.loading.users = true;
+  this.error.users = null;
+  try {
+    console.log('Loading users...');
+    // Get all users, including inactive ones
+    this.users = await api.getUsers();
+    console.log('Users loaded:', this.users.length);
+    
+    // Initialize filtered users
+    this.applyUserFilters();
+  } catch (error) {
+    console.error('Error loading users:', error);
+    this.error.users = `Failed to load users: ${error.message}`;
+  } finally {
+    this.loading.users = false;
+  }
+},
+
+  // User filtering and toggling methods
+applyUserFilters() {
+  if (!this.users) {
+    this.filteredUsers = [];
+    return;
+  }
+  
+  let result = [...this.users];
+  
+  // Filter by active/inactive status
+  if (!this.showInactiveUsers) {
+    result = result.filter(user => user.Deleted === 'No');
+  }
+  
+  // Filter by search query
+  if (this.userSearchQuery.trim()) {
+    const query = this.userSearchQuery.toLowerCase();
+    result = result.filter(user => 
+      (user.User_fName && user.User_fName.toLowerCase().includes(query)) ||
+      (user.User_lName && user.User_lName.toLowerCase().includes(query)) ||
+      (user.Username && user.Username.toLowerCase().includes(query)) ||
+      (user.UserType && user.UserType.toLowerCase().includes(query))
+    );
+  }
+  
+  this.filteredUsers = result;
+},
+
+async toggleUserStatus(user) {
+  try {
+    const updatedUser = {
+      User_fName: user.User_fName,
+      User_lName: user.User_lName,
+      Username: user.Username,
+      UserType: user.UserType,
+      Deleted: user.Deleted === 'No' ? 'Yes' : 'No' // Toggle the status
+    };
+    
+    await api.updateUser(user.UserID, updatedUser);
+    
+    // Update the local user object to reflect the change
+    user.Deleted = updatedUser.Deleted;
+    
+    // Show success message
+    const status = updatedUser.Deleted === 'No' ? 'activated' : 'deactivated';
+    console.log(`User ${user.Username} has been ${status}.`);
+  } catch (error) {
+    console.error('Error toggling user status:', error);
+    alert(`Error changing user status: ${error.message}`);
+    
+    // Revert the visual change
+    this.loadUsers();
+  }
+},
 
   // Technician methods
   async loadTechnicians() {
@@ -642,3 +733,111 @@ methods: {
 }
 };
 </script>
+
+
+<style scoped>
+/* Add these styles to your component */
+
+/* Filter controls */
+.filter-controls {
+  display: flex;
+  align-items: center;
+  margin-top: 1rem;
+  gap: 1rem;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.search-box {
+  flex-grow: 1;
+  max-width: 300px;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Toggle switch */
+.status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #4CAF50;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #4CAF50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 24px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.status-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-label.active {
+  color: #4CAF50;
+}
+
+.status-label.inactive {
+  color: #F44336;
+}
+</style>

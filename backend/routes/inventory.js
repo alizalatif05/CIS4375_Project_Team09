@@ -123,7 +123,7 @@ router.get('/techinventory', authenticateUser, async (req, res) => {
             SELECT
                 ti.SKU_Number,
                 ti.TechID,
-                ti.Quantity,
+                ti.QTY,
                 i.ItemName,
                 i.Item_Desc
             FROM TechInventory ti
@@ -137,6 +137,63 @@ router.get('/techinventory', authenticateUser, async (req, res) => {
         res.status(500).json({ message: 'Database query error', error: err.message });
     }
 });
+
+router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, res) => {
+    try {
+        const { oldSku, oldTechId } = req.params;
+        const { newTechId, quantity, newSkuNumber } = req.body;
+        
+        // Validate parameters
+        if (!quantity && !newTechId && !newSkuNumber) {
+            return res.status(400).json({ message: 'At least one field to update is required' });
+        }
+        
+        // Start building the query
+        let query = 'UPDATE TechInventory SET ';
+        const values = [];
+        const updates = [];
+        
+        // Add quantity if provided (using QTY to match your schema)
+        if (quantity) {
+            updates.push('QTY = ?');
+            values.push(quantity);
+        }
+        
+        // Add new SKU if provided
+        if (newSkuNumber) {
+            updates.push('SKU_Number = ?');
+            values.push(newSkuNumber);
+        }
+        
+        // Add new tech ID if provided
+        if (newTechId) {
+            updates.push('TechID = ?');
+            values.push(newTechId);
+        }
+        
+        // Complete the query
+        query += updates.join(', ');
+        query += ' WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"';
+        values.push(oldSku, oldTechId);
+        
+        // Execute the update
+        const [result] = await pool.query(query, values);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
+        }
+        
+        res.json({
+            message: 'Technician inventory updated successfully',
+            affectedRows: result.affectedRows
+        });
+        
+    } catch (err) {
+        console.error('Error updating technician inventory:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
 
 /** 
  *  ORDER ROUTES
@@ -235,7 +292,7 @@ router.get('/sales_reps/:id', authenticateUser, async (req, res) => {
 
 router.get('/user', authenticateUser, async (req, res) => {
     try {
-        const [results] = await pool.query('SELECT * FROM User WHERE Deleted = "No"');
+        const [results] = await pool.query('SELECT * FROM User');
         res.json(results);
     } catch (err) {
         console.error('Error fetching users:', err);
@@ -821,7 +878,7 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
                  // Reactivating: Behavior remains the same - set quantity to the requested amount.
                  // Inventory check already passed above for 'quantityToAddOrAssign'.
                 await connection.query(
-                    'UPDATE TechInventory SET Quantity = ?, Deleted = "No" WHERE SKU_Number = ? AND TechID = ?',
+                    'UPDATE TechInventory SET QTY = ?, Deleted = "No" WHERE SKU_Number = ? AND TechID = ?',
                     [quantityToAddOrAssign, skuNumber, techId]
                 );
                  // Decrease main inventory quantity by the amount being assigned now
@@ -843,7 +900,7 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
 
                 // Update TechInventory quantity to the NEW TOTAL
                 await connection.query(
-                    'UPDATE TechInventory SET Quantity = ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+                    'UPDATE TechInventory SET QTY = ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
                     [newTotalQty, skuNumber, techId]
                 );
 
@@ -864,7 +921,7 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
             // New Assignment: Behavior remains the same - assign 'quantityToAddOrAssign'.
             // Inventory check already passed above.
             await connection.query(
-                'INSERT INTO TechInventory (SKU_Number, TechID, Quantity, Deleted) VALUES (?, ?, ?, "No")',
+                'INSERT INTO TechInventory (SKU_Number, TechID, QTY, Deleted) VALUES (?, ?, ?, "No")',
                 [skuNumber, techId, quantityToAddOrAssign]
             );
              // Decrease main inventory quantity
@@ -943,7 +1000,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
 
          // Get current assigned quantity
          const [currentRows] = await connection.query(
-             'SELECT Quantity FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE', // Lock row
+             'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE', // Lock row
              [oldSku, oldTechId]
          );
 
@@ -1008,7 +1065,7 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
 
         // 1. Find the quantity being removed from the technician (lock the row)
         const [techInvRows] = await connection.query(
-            'SELECT Quantity FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
+            'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
             [sku, techId]
         );
 
