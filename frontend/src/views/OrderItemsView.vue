@@ -146,7 +146,7 @@
               <label>Quantity:</label>
               <input
                 type="number"
-                v-model.number="itemToAdd.quantity"
+                v-model.number="itemToAdd.QTY"
                 min="1"
                 :max="getMaxQuantity()"
                 :disabled="!itemToAdd.SKU_Number"
@@ -155,7 +155,7 @@
             <button
               @click="addToItemsList"
               class="btn-add-item"
-              :disabled="!itemToAdd.SKU_Number || itemToAdd.quantity < 1"
+              :disabled="!itemToAdd.SKU_Number || itemToAdd.QTY < 1"
             >
               Add to List
             </button>
@@ -174,7 +174,7 @@
               <tbody>
                 <tr v-for="(item, index) in selectedItems" :key="index">
                   <td>{{ getItemName(item.SKU_Number) }}</td>
-                  <td>{{ item.quantity }}</td>
+                  <td>{{ item.QTY }}</td>
                   <td>
                     <button @click="removeItemFromList(index)" class="btn-remove">Remove</button>
                   </td>
@@ -219,7 +219,7 @@
               <label>Quantity:</label>
               <input
                 type="number"
-                v-model.number="editItemForm.quantity"
+                v-model.number="editItemForm.QTY"
                 min="1"
                 :max="getMaxQuantityForEdit()"
                 required
@@ -246,7 +246,7 @@ export default {
       editItemForm: {
         OrderID: null,
         SKU_Number: null,
-        quantity: 1,
+        QTY: 1,
         originalSKU: null // Store the original SKU in case it's changed
       },
 
@@ -283,7 +283,7 @@ export default {
       // State for the 'Add Items' modal form
       itemToAdd: {
         SKU_Number: '',
-        quantity: 1
+        QTY: 1
       },
       selectedItems: [], // List of items staged to be added to an order
 
@@ -385,25 +385,33 @@ export default {
     },
 
     // Fetches the detailed items (including quantity) for a specific order from the API. ERROR HERE
-    async loadOrderItems(orderID) {
-      this.loading.orderItems = true;
-      this.error.orderItems = null;
-      try {
-        const orderDetails = await api.fetchData(`/orders/${orderID}`);
-        // Map the response to include ItemName, SKU_Number, and Quantity
-        this.orderItems = orderDetails.map(item => ({
-          ItemName: item.ItemName, // Assuming backend provides ItemName
-          SKU_Number: item.SKU_Number,
-          Quantity: item.QTY || 1 // Use QTY field, default to 1 if missing
-        }));
-      } catch (error) {
-        console.error('Error loading order items:', error);
-        this.error.orderItems = `Failed to load order items: ${error.message}`;
-        this.orderItems = []; // Clear items on error
-      } finally {
-        this.loading.orderItems = false;
-      }
-    },
+
+ // Fetches the detailed items for a specific order from the API.
+async loadOrderItems(orderID) {
+  if (!orderID) return; // Don't proceed if no order ID is provided
+  
+  this.loading.orderItems = true;
+  this.error.orderItems = null;
+  try {
+    // Use the dedicated endpoint for order items
+    const orderItems = await api.fetchData(`/orders/${orderID}/items`);
+    
+    // Since we're now using the correct endpoint, we expect an array response
+    if (Array.isArray(orderItems)) {
+      this.orderItems = orderItems;
+    } else {
+      console.error('Expected array of order items but got:', orderItems);
+      this.error.orderItems = 'Unexpected data format received from server';
+      this.orderItems = [];
+    }
+  } catch (error) {
+    console.error('Error loading order items:', error);
+    this.error.orderItems = `Failed to load order items: ${error.message}`;
+    this.orderItems = []; // Clear items on error
+  } finally {
+    this.loading.orderItems = false;
+  }
+},
 
     // Fetches the list of customers from the API.
     async loadCustomers() {
@@ -521,13 +529,31 @@ export default {
         this.loadOrderItems(order.OrderID); // Load items for the expanded order
       }
     },
-
+      // Opens the modal for adding multiple items to the selected order.
+      async showAddItems(order) {
+        this.selectedOrder = order; // Set the target order
+        try {
+          // Ensure inventory is loaded before opening the modal
+          if (this.inventory.length === 0) {
+            await this.loadInventory();
+          }
+          // Reset the item selection form and list
+          this.selectedItems = []; 
+          this.itemToAdd = { SKU_Number: '', QTY: 1 };
+          this.showAddItemsModal = true; // Open the modal
+          console.log('Available items for adding:', this.availableItems); 
+        } catch (error) {
+          console.error('Error preparing to add items:', error);
+          this.error.inventory = 'Failed to load inventory items';
+          alert('Error loading inventory. Cannot add items.');
+        }
+      },
     // Prepares the edit item modal with the selected item's data.
     editOrderItem(item) {
       this.editItemForm = {
         OrderID: this.expandedOrder,         // Get OrderID from the currently expanded order
         SKU_Number: item.SKU_Number,
-        quantity: item.QTY || 1,       // Use existing quantity or default to 1
+        QTY: item.QTY || 1,       // Use existing quantity or default to 1
         originalSKU: item.SKU_Number      // Store the original SKU
       };
       this.showEditItemModal = true;
@@ -539,82 +565,67 @@ export default {
       this.editItemForm = { // Reset form
         OrderID: null,
         SKU_Number: null,
-        quantity: 1,
+        QTY: 1,
         originalSKU: null
       };
     },
 
     // Saves the edited order item via API (replaces old item with new details).
-    async saveEditedItem() {
-      try {
-        // API endpoint might handle update directly, or require delete then add.
-        // Assuming an update endpoint exists or delete/add logic in api service.
-        // Here, implementing delete then add as per original logic:
-        
-        // 1. Delete the original item entry
-        await api.deleteOrderItem(this.editItemForm.OrderID, this.editItemForm.originalSKU);
+async saveEditedItem() {
+  try {
+    // Add more debugging to see exactly what's happening
+    console.log('Edit Item Form Data:', {
+      OrderID: this.editItemForm.OrderID,
+      SKU_Number: this.editItemForm.SKU_Number, 
+      originalSKU: this.editItemForm.originalSKU,
+      QTY: this.editItemForm.QTY
+    });
+    
+    // Make sure QTY is defined and valid
+    if (!this.editItemForm.QTY || isNaN(Number(this.editItemForm.QTY)) || this.editItemForm.QTY < 1) {
+      alert('Please enter a valid quantity (minimum 1)');
+      return;
+    }
 
-        // 2. Add the item entry with new SKU/quantity
-        await api.fetchData('/orderitems', { // Using generic fetchData for POST
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            skuNumber: this.editItemForm.SKU_Number,
-            orderID: this.editItemForm.OrderID,
-            quantity: this.editItemForm.quantity
-          })
-        });
+    // If we're not changing the SKU, set it to the original to avoid confusion
+    const requestBody = {
+      QTY: Number(this.editItemForm.QTY)
+    };
+    
+    // Only include skuNumber if it's actually changing
+    if (this.editItemForm.SKU_Number !== this.editItemForm.originalSKU) {
+      requestBody.skuNumber = this.editItemForm.SKU_Number;
+    }
+    
+    console.log('Sending update request:', {
+      url: `/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`,
+      body: requestBody
+    });
+    
+    // Call the PUT endpoint
+    await api.fetchData(`/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
 
-        // Refresh the order items list for the current order
-        await this.loadOrderItems(this.expandedOrder); 
-        await this.loadInventory(); // Refresh inventory in case stock changed
+    // Refresh the order items
+    await this.loadOrderItems(this.expandedOrder); 
+    await this.loadInventory();
 
-        this.cancelEditItem(); // Close modal and reset form
-      } catch (error) {
-        console.error('Error updating order item:', error);
-        alert(`Error updating order item: ${error.message}`);
-        // Optionally, try to re-add the original item if the add fails? Complex recovery.
-      }
-    },
-
-    // Prepares the main order form for editing an existing order.
-    editOrder(order) {
-      this.editingOrder = order; // Set the order being edited
-      this.orderForm = { // Populate form with existing order data
-        CustomerID: order.CustomerID,
-        SalesRepID: order.SalesRepID,
-        TechID: order.TechID
-        // Items are handled separately
-      };
-      this.showOrderCreateForm = true; // Show the modal
-    },
-
-    // Opens the modal for adding multiple items to the selected order.
-    async showAddItems(order) {
-      this.selectedOrder = order; // Set the target order
-      try {
-        // Ensure inventory is loaded before opening the modal
-        if (this.inventory.length === 0) {
-          await this.loadInventory();
-        }
-        // Reset the item selection form and list
-        this.selectedItems = []; 
-        this.itemToAdd = { SKU_Number: '', quantity: 1 };
-        this.showAddItemsModal = true; // Open the modal
-        console.log('Available items for adding:', this.availableItems); 
-      } catch (error) {
-        console.error('Error preparing to add items:', error);
-        this.error.inventory = 'Failed to load inventory items';
-        alert('Error loading inventory. Cannot add items.');
-      }
-    },
+    this.cancelEditItem();
+  } catch (error) {
+    console.error('Error updating order item:', error);
+    alert(`Error updating order item: ${error.message}`);
+  }
+},
 
     // Closes the 'Add Items' modal and clears the selection list and form.
     cancelAddItems() {
       this.showAddItemsModal = false;
       this.selectedOrder = null;
       this.selectedItems = [];
-      this.itemToAdd = { SKU_Number: '', quantity: 1 };
+      this.itemToAdd = { SKU_Number: '', QTY: 1 };
     },
     
     // Helper method: Calculates max quantity for the item selected in the 'Add Items' modal.
@@ -626,7 +637,7 @@ export default {
 
     // Adds the currently selected item and quantity to the temporary list in the 'Add Items' modal.
     addToItemsList() {
-      if (!this.itemToAdd.SKU_Number || this.itemToAdd.quantity < 1) return; // Validation
+      if (!this.itemToAdd.SKU_Number || this.itemToAdd.QTY < 1) return; // Validation
 
       const existingIndex = this.selectedItems.findIndex(
         item => item.SKU_Number === this.itemToAdd.SKU_Number
@@ -635,17 +646,17 @@ export default {
       if (existingIndex >= 0) {
         // If item already in list, update its quantity
         // TODO: Add check against available inventory if necessary
-        this.selectedItems[existingIndex].quantity += this.itemToAdd.quantity;
+        this.selectedItems[existingIndex].QTY += this.itemToAdd.QTY;
       } else {
         // If new item, add it to the list
         this.selectedItems.push({
           SKU_Number: this.itemToAdd.SKU_Number,
-          quantity: this.itemToAdd.quantity
+          QTY: this.itemToAdd.QTY
         });
       }
 
       // Reset the form for the next item
-      this.itemToAdd = { SKU_Number: '', quantity: 1 };
+      this.itemToAdd = { SKU_Number: '', QTY: 1 };
     },
 
     // Removes an item from the temporary list in the 'Add Items' modal based on its index.
@@ -670,7 +681,7 @@ export default {
             body: JSON.stringify({
               skuNumber: item.SKU_Number,
               orderID: this.selectedOrder.OrderID,
-              quantity: item.quantity
+              QTY: item.QTY
             })
           });
         }
@@ -759,55 +770,7 @@ export default {
       };
     }
 
-    /* // The following methods seem potentially unused or legacy based on the modal logic
-    // Kept here for reference but commented out.
-
-    // [Potentially unused helper] Adds multiple items (SKUs) to a specified order.
-    async addItemsToOrder_Helper(orderID, items) { // Renamed to avoid conflict
-      try {
-        for (const sku of items) { // Assumes 'items' is an array of SKUs
-          await api.fetchData('/orderitems', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              skuNumber: sku,
-              orderID: orderID
-              // Missing quantity? This version seems incomplete.
-            })
-          });
-        }
-      } catch (error) {
-        console.error('Error adding items to order (helper):', error);
-        throw error; // Re-throw error to be handled by caller
-      }
-    },
-    
-    // [Legacy?] Adds a single selected inventory item to the currently selected order.
-    async addItemToOrder() {
-      if (!this.selectedItem || !this.selectedOrder) { // selectedItem is not used in the new modal
-        alert('Please select an item (Legacy function check)');
-        return;
-      }
-
-      try {
-        // Assumes api.addOrderItem handles adding a single item (SKU)
-        await api.addOrderItem(this.selectedOrder.OrderID, this.selectedItem);
-
-        // Refresh order items display
-        if (this.expandedOrder === this.selectedOrder.OrderID) {
-          await this.loadOrderItems(this.selectedOrder.OrderID);
-        }
-        
-        await this.loadInventory(); // Refresh inventory
-
-        this.cancelAddItems(); // Close modal (might reset state needed by new logic)
-
-      } catch (error) {
-        console.error('Error adding single item to order:', error);
-        alert(`Error adding item to order: ${error.message}`);
-      }
-    }
-    */
+ 
   }
 };
 </script>

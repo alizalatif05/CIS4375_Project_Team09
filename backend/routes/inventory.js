@@ -247,6 +247,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
  *  ORDER ROUTES
  */
 
+// Get all orders
 router.get('/orders', authenticateUser, async (req, res) => {
     try {
         const [results] = await pool.query('SELECT * FROM `Order` WHERE Deleted = "No"');
@@ -257,6 +258,7 @@ router.get('/orders', authenticateUser, async (req, res) => {
     }
 });
 
+// Get a specific order
 router.get('/orders/:id', authenticateUser, async (req, res) => {
     try {
         const [results] = await pool.query('SELECT * FROM `Order` WHERE OrderID = ?', [req.params.id]);
@@ -267,13 +269,31 @@ router.get('/orders/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/**
- * GET /api/orderitems - Retrieve all order items
- */
+// Get items for a specific order
+router.get('/orders/:id/items', authenticateUser, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const query = `
+            SELECT oi.SKU_Number, oi.OrderID, oi.QTY, 
+                i.ItemName, i.Item_Desc 
+            FROM OrderItems oi
+            JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
+            WHERE oi.OrderID = ? AND oi.Deleted = 'No';
+        `;
+
+        const [results] = await pool.query(query, [orderId]);
+        res.json(results); // Return array of items
+    } catch (err) {
+        console.error('Error fetching items for order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+// Get all order items
 router.get('/orderitems', authenticateUser, async (req, res) => {
     try {
         const query = `
-            SELECT OrderItems.SKU_Number, OrderItems.OrderID, 
+            SELECT OrderItems.SKU_Number, OrderItems.OrderID, OrderItems.QTY,
                 Inventory.ItemName, Inventory.Item_Desc 
             FROM OrderItems
             JOIN Inventory ON OrderItems.SKU_Number = Inventory.SKU_Number
@@ -284,6 +304,70 @@ router.get('/orderitems', authenticateUser, async (req, res) => {
         res.json(results);
     } catch (err) {
         console.error('Error fetching order items:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+
+/**
+ * PUT /api/orderitems/:orderId/:sku - Update a specific order item
+ */
+router.put('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
+    try {
+        const { orderId, sku } = req.params;
+        const { skuNumber, QTY } = req.body;
+        
+        // Validate input
+        if (!QTY || QTY < 1) {
+            return res.status(400).json({ message: 'Quantity must be at least 1' });
+        }
+        
+        const connection = await pool.getConnection();
+        
+        try {
+            // First check if the item being edited exists
+            const [currentItem] = await connection.query(
+                'SELECT * FROM OrderItems WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                [orderId, sku]
+            );
+            
+            if (!currentItem || currentItem.length === 0) {
+                return res.status(404).json({ message: 'Order item not found' });
+            }
+            
+            // If we're changing the SKU to a different value (not just updating quantity)
+            if (skuNumber && skuNumber !== sku) {
+                // Check if the new SKU already exists in this order
+                const [existingCheck] = await connection.query(
+                    'SELECT * FROM OrderItems WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                    [orderId, skuNumber]
+                );
+                
+                if (existingCheck && existingCheck.length > 0) {
+                    return res.status(409).json({ 
+                        message: 'This order already contains the item you are trying to change to'
+                    });
+                }
+                
+                // Update SKU and quantity
+                await connection.query(
+                    'UPDATE OrderItems SET SKU_Number = ?, QTY = ? WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                    [skuNumber, QTY, orderId, sku]
+                );
+            } else {
+                // Just update quantity (keeping the same SKU)
+                await connection.query(
+                    'UPDATE OrderItems SET QTY = ? WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                    [QTY, orderId, sku]
+                );
+            }
+            
+            res.json({ message: 'Order item updated successfully' });
+        } finally {
+            connection.release();
+        }
+    } catch (err) {
+        console.error('Error updating order item:', err);
         res.status(500).json({ message: 'Database query error', error: err.message });
     }
 });
@@ -726,10 +810,11 @@ router.post('/orders', authenticateUser, async (req, res) => {
 });
 
 /**
- * POST /api/orderitems - Add items to an order
+ * POST /api/orderitems - Add items to an order or update quantities if item exists
  */
 router.post('/orderitems', authenticateUser, async (req, res) => {
-    const { skuNumber, orderID } = req.body;
+    const { skuNumber, orderID, QTY } = req.body;
+    const quantity = QTY || 1; // Default to 1 if no quantity provided
 
     if (!skuNumber || !orderID) {
         return res.status(400).json({ message: 'SKU Number and Order ID are required' });
@@ -749,24 +834,33 @@ router.post('/orderitems', authenticateUser, async (req, res) => {
             if (rows && rows.length > 0) {
                 const existing = rows[0];
                 if (existing.Deleted === 'Yes') {
-                    // Reactivate soft-deleted assignment
+                    // Reactivate soft-deleted assignment and set new quantity
                     await connection.query(
-                        'UPDATE OrderItems SET Deleted = "No" WHERE SKU_Number = ? AND OrderID = ?',
-                        [skuNumber, orderID]
+                        'UPDATE OrderItems SET Deleted = "No", QTY = ? WHERE SKU_Number = ? AND OrderID = ?',
+                        [quantity, skuNumber, orderID]
                     );
                     return res.status(200).json({
                         message: 'Order item reactivated successfully'
                     });
+                } else {
+                    // Item exists and is active - update the quantity (add to existing)
+                    const newQuantity = Number(existing.QTY || 0) + Number(quantity);
+                    
+                    await connection.query(
+                        'UPDATE OrderItems SET QTY = ? WHERE SKU_Number = ? AND OrderID = ?',
+                        [newQuantity, skuNumber, orderID]
+                    );
+                    
+                    return res.status(200).json({
+                        message: 'Order item quantity updated successfully'
+                    });
                 }
-                return res.status(409).json({
-                    message: 'This item is already in this order'
-                });
             }
 
-            // Create new assignment
+            // Create new assignment with quantity
             await connection.query(
-                'INSERT INTO OrderItems (SKU_Number, OrderID) VALUES (?, ?)',
-                [skuNumber, orderID]
+                'INSERT INTO OrderItems (SKU_Number, OrderID, QTY) VALUES (?, ?, ?)',
+                [skuNumber, orderID, quantity]
             );
 
             res.status(201).json({ message: 'Order item added successfully' });
@@ -775,11 +869,6 @@ router.post('/orderitems', authenticateUser, async (req, res) => {
             connection.release();
         }
     } catch (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({
-                message: 'This item is already in this order'
-            });
-        }
         console.error('Database error:', err);
         return res.status(500).json({
             message: 'Database query error',
@@ -875,8 +964,6 @@ router.delete('/customers/:id', authenticateUser, async (req, res) => {
 
 /**
  * POST /api/techinventory - Assign an item with quantity to a technician
- * MODIFIED BEHAVIOR: If item is already actively assigned, ADDS the requested quantity.
- * Handles new assignments and reactivation as before.
  */
 router.post('/techinventory', authenticateUser, async (req, res) => {
     // 'quantity' from the request now represents the amount to ADD or the initial amount
