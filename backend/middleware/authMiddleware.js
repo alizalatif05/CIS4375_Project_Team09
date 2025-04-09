@@ -1,8 +1,7 @@
 // middleware/authMiddleware.js
-
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
-const pool = require('../db'); // Import the database connection
+const pool = require('../db');
 
 dotenv.config();
 
@@ -19,7 +18,11 @@ const authenticateUser = async (req, res, next) => {
         const actualToken = token.startsWith('Bearer ') ? token.slice(7) : token;
         
         // Verify the token
-        const decoded = jwt.verify(actualToken, process.env.JWT_SECRET || 'fallback_secret');
+        const decoded = jwt.verify(
+            actualToken, 
+            process.env.JWT_SECRET || 'supersecretkey',
+            { algorithms: ['HS256'] } // Explicitly specify algorithm for added security
+        );
         
         // Look up the user in the database to confirm they exist and get current status
         const [users] = await pool.query(
@@ -46,9 +49,11 @@ const authenticateUser = async (req, res, next) => {
         
         if (err.name === 'TokenExpiredError') {
             return res.status(401).json({ message: 'Token expired' });
+        } else if (err.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: 'Invalid token' });
         }
         
-        res.status(401).json({ message: 'Invalid token' });
+        res.status(401).json({ message: 'Authentication failed' });
     }
 };
 
@@ -66,11 +71,7 @@ const authorizeAdmin = (req, res, next) => {
 // Middleware that checks if the user is an admin and sets an isAdmin flag
 // but allows the request to continue regardless of user type
 const checkAdmin = (req, res, next) => {
-    // req.user is already set by authenticateUser middleware
-    // We just need to make sure isAdmin flag is passed along correctly
-    
-    // You could add additional logging here if needed
-    // console.log(`User ${req.user.username} accessing path ${req.path} with admin status: ${req.user.isAdmin}`);
+
     
     next();
 };
