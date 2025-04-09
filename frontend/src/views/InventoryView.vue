@@ -574,7 +574,7 @@ export default {
           body: JSON.stringify({
             skuNumber: this.techInventoryForm.SKU_Number,
             techId: this.techInventoryForm.TechID,
-            quantity: this.techInventoryForm.QTY
+            QTY: this.techInventoryForm.QTY
           })
         });
       } else {
@@ -585,7 +585,7 @@ export default {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            quantity: this.techInventoryForm.QTY
+            QTY: this.techInventoryForm.QTY
           })
         });
       }
@@ -604,7 +604,12 @@ export default {
       });
     }
     
-    await this.loadTechnicianInventory();
+    // Reload both inventories to refresh quantities
+    await Promise.all([
+      this.loadTechnicianInventory(),
+      this.loadInventory()  
+    ]);
+    
     this.cancelTechInventoryForm();
   } catch (error) {
     console.error('Error saving technician inventory:', error);
@@ -711,8 +716,7 @@ export default {
          }
      },
 
-    async saveBulkAssignment() {
-      
+     async saveBulkAssignment() {
       if (!this.bulkAssignForm.technicianId || this.bulkAssignForm.selectedItems.length === 0) {
         alert("Please select a technician and at least one item.");
         return;
@@ -720,36 +724,49 @@ export default {
 
       this.processingBulkAssign = true;
       const techId = this.bulkAssignForm.technicianId;
+      
+      // Debug - check what values are being sent
+      console.log("Quantities before processing:", this.bulkAssignForm.quantities);
+      
       const itemsToAssign = this.bulkAssignForm.selectedItems.map(sku => {
-        const quantity = Number(this.bulkAssignForm.quantities[sku]) || 1;
-
+        // Ensure proper conversion to a valid number 
+        let QTY = parseInt(this.bulkAssignForm.quantities[sku]);
+        
+        // Log each conversion to debug - FIXED to use QTY
+        console.log(`SKU ${sku}: original=${this.bulkAssignForm.quantities[sku]}, converted=${QTY}`);
+        
+        // Force a minimum of 1 if not valid
+        if (isNaN(QTY) || QTY < 1) {
+          QTY = 1;
+          console.log(`SKU ${sku}: using default quantity 1`);
+        }
+        
         return {
           skuNumber: sku,
           techId: techId,
-          quantity: quantity // Default to 1 if somehow unset
+          QTY: QTY // Use the properly converted and validated value
         };
       });
 
-      
-
+      console.log("Final items to assign:", itemsToAssign);
       console.log(`Starting bulk assignment of ${itemsToAssign.length} items to technician ${techId}`);
 
-      // Validate quantities before sending
-       let validationPassed = true;
-       const inventoryMap = new Map(this.inventory.map(item => [item.SKU_Number, item.Item_Quantity]));
+  // Validate quantities before sending - FIXED to use QTY
+      let validationPassed = true;
+      const inventoryMap = new Map(this.inventory.map(item => [item.SKU_Number, item.Item_Quantity]));
 
-        itemsToAssign.forEach(assignment => {
-            const available = inventoryMap.get(assignment.skuNumber);
-            if (assignment.quantity < 1 || assignment.quantity > available) {
-                alert(`Invalid quantity (${assignment.quantity}) for item SKU ${assignment.skuNumber}. Available: ${available}. Minimum: 1.`);
-                validationPassed = false;
-            }
-        });
-
-        if (!validationPassed) {
-            this.processingBulkAssign = false;
-            return; // Stop if validation fails
+      itemsToAssign.forEach(assignment => {
+        const available = inventoryMap.get(assignment.skuNumber);
+        if (assignment.QTY < 1 || assignment.QTY > available) {
+          alert(`Invalid quantity (${assignment.QTY}) for item SKU ${assignment.skuNumber}. Available: ${available}. Minimum: 1.`);
+          validationPassed = false;
         }
+      });
+
+      if (!validationPassed) {
+        this.processingBulkAssign = false;
+        return; // Stop if validation fails
+      }
 
        // Use Promise.allSettled to handle individual errors gracefully
       try {
@@ -777,8 +794,13 @@ export default {
         }
         alert(message);
 
-        await this.loadTechnicianInventory(); // Refresh the list
-        this.cancelBulkAssignForm(); // Close and reset the form
+        await Promise.all([
+          // Refresh Inventory
+          this.loadTechnicianInventory(), 
+          this.loadInventory()
+      ]);
+
+      this.cancelBulkAssignForm(); // Close and reset the form
 
       } catch (error) {
         // Catch errors not related to individual API calls (e.g., network error before sending)
@@ -962,7 +984,7 @@ export default {
   padding: 0; /* Reset padding */
 }
 
-/* Standard button styles from your original CSS (assuming they exist) */
+/* Standard button styles  */
 .create-btn, .btn-view, .btn-edit, .btn-delete, .btn-save, .btn-cancel {
   /* Make sure these have common base styles */
   padding: 8px 15px;

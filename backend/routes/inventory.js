@@ -138,56 +138,104 @@ router.get('/techinventory', authenticateUser, async (req, res) => {
     }
 });
 
+// Put for inventory edit updates
+
 router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, res) => {
     try {
         const { oldSku, oldTechId } = req.params;
-        const { newTechId, quantity, newSkuNumber } = req.body;
+        const { newTechId, QTY, newSkuNumber } = req.body;
         
         // Validate parameters
-        if (!quantity && !newTechId && !newSkuNumber) {
+        if (!QTY && !newTechId && !newSkuNumber) {
             return res.status(400).json({ message: 'At least one field to update is required' });
         }
         
-        // Start building the query
-        let query = 'UPDATE TechInventory SET ';
-        const values = [];
-        const updates = [];
+        // Get a connection for transaction
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
         
-        // Add quantity if provided (using QTY to match your schema)
-        if (quantity) {
-            updates.push('QTY = ?');
-            values.push(quantity);
+        try {
+            // First, get the current quantity assigned to the technician
+            const [currentRows] = await connection.query(
+                'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+                [oldSku, oldTechId]
+            );
+            
+            if (!currentRows || currentRows.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
+            }
+            
+            const currentQty = currentRows[0].QTY;
+            
+            // Start building the query
+            let query = 'UPDATE TechInventory SET ';
+            const values = [];
+            const updates = [];
+            
+            // Calculate quantity difference and update inventory if needed
+            if (QTY) {
+                const newQty = parseInt(QTY);
+                const qtyDifference = newQty - currentQty;
+                
+                // If increasing quantity, check if enough inventory is available
+                if (qtyDifference > 0) {
+                    const [invRows] = await connection.query(
+                        'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
+                        [oldSku]
+                    );
+                    
+                    if (!invRows || invRows.length === 0 || invRows[0].Item_Quantity < qtyDifference) {
+                        await connection.rollback();
+                        return res.status(400).json({ 
+                            message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.Item_Quantity ?? 0}` 
+                        });
+                    }
+                }
+                
+                updates.push('QTY = ?');
+                values.push(newQty);
+                
+                // Update main inventory - subtract if increasing, add if decreasing
+                if (qtyDifference !== 0) {
+                    await connection.query(
+                        'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                        [qtyDifference, oldSku]
+                    );
+                }
+            }
+            
+            // Add new tech ID if provided
+            if (newTechId) {
+                updates.push('TechID = ?');
+                values.push(newTechId);
+            }
+            
+            // Complete the query
+            query += updates.join(', ');
+            query += ' WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"';
+            values.push(oldSku, oldTechId);
+            
+            // Execute the update
+            const [result] = await connection.query(query, values);
+            
+            if (result.affectedRows === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
+            }
+            
+            await connection.commit();
+            
+            res.json({
+                message: 'Technician inventory updated successfully',
+                affectedRows: result.affectedRows
+            });
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
         }
-        //This may cause an error
-        // // Add new SKU if provided
-        // if (newSkuNumber) {
-        //     updates.push('SKU_Number = ?');
-        //     values.push(newSkuNumber);
-        // }
-        
-        // Add new tech ID if provided
-        if (newTechId) {
-            updates.push('TechID = ?');
-            values.push(newTechId);
-        }
-        
-        // Complete the query
-        query += updates.join(', ');
-        query += ' WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"';
-        values.push(oldSku, oldTechId);
-        
-        // Execute the update
-        const [result] = await pool.query(query, values);
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
-        }
-        
-        res.json({
-            message: 'Technician inventory updated successfully',
-            affectedRows: result.affectedRows
-        });
-        
     } catch (err) {
         console.error('Error updating technician inventory:', err);
         res.status(500).json({ message: 'Database query error', error: err.message });
@@ -976,82 +1024,6 @@ router.delete('/inventory/:sku', authenticateUser, async (req, res) => {
     }
  })
 
-/**
- * PUT /api/techinventory/:sku/:techId - Update assignment quantity ONLY
- * Note: Simplified to only handle quantity updates for an existing, active assignment.
- */
-router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, res) => {
-    const { oldSku, oldTechId } = req.params;
-    const { quantity } = req.body; // Only expect quantity
-
-    // Validate quantity
-    if (quantity === undefined) {
-         return res.status(400).json({ message: 'Quantity is required for update.' });
-    }
-    const qty = parseInt(quantity);
-    if (isNaN(qty) || qty < 1) {
-         return res.status(400).json({ message: 'Quantity must be a positive number.' });
-    }
-
-     let connection;
-     try {
-         connection = await pool.getConnection();
-         await connection.beginTransaction();
-
-         // Get current assigned quantity
-         const [currentRows] = await connection.query(
-             'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE', // Lock row
-             [oldSku, oldTechId]
-         );
-
-         if (!currentRows || currentRows.length === 0) {
-             await connection.rollback();
-             return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
-         }
-         const currentQty = currentRows[0].Quantity;
-         const qtyDifference = qty - currentQty; // Calculate change (positive if increasing, negative if decreasing)
-
-         // Check available inventory *only if increasing* quantity
-         if (qtyDifference > 0) {
-             // Check current available inventory for the *difference* needed
-             const [invRows] = await connection.query(
-                 'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"', [oldSku]
-             );
-             // Check if inventory item exists and has enough stock for the increase
-             if (!invRows || invRows.length === 0 || invRows[0].Item_Quantity < qtyDifference) {
-                  await connection.rollback();
-                  return res.status(400).json({ message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.Item_Quantity ?? 0}` });
-             }
-         }
-
-          // Update TechInventory quantity
-          await connection.query(
-              'UPDATE TechInventory SET QTY= ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
-              [qty, oldSku, oldTechId]
-          );
-
-           // Adjust main Inventory quantity by the difference
-           // If qtyDifference is negative, this correctly adds the amount back to inventory
-           await connection.query(
-               'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
-               [qtyDifference, oldSku]
-           );
-
-         await connection.commit();
-         res.json({ message: `Technician inventory quantity updated to ${qty}` });
-
-     } catch (err) {
-         if (connection) await connection.rollback();
-         // Add constraint violation checks if needed (e.g., inventory going negative)
-         if (err.code === 'ER_CHECK_CONSTRAINT_VIOLATED' || err.message.includes('Item_Quantity_NonNegative')) {
-            return res.status(400).json({ message: `Operation failed: Inventory quantity cannot go below zero for SKU ${oldSku}.`});
-         }
-         console.error('Error updating tech inventory quantity:', err);
-         return res.status(500).json({ message: 'Database query error during quantity update', error: err.message });
-     } finally {
-         if (connection) connection.release();
-     }
-});
 
 /**
  * DELETE /api/techinventory/:sku/:techId - Soft delete a technician's inventory assignment (return item to main inventory)
