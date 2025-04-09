@@ -23,6 +23,7 @@
         </button>
       </div>
 
+      
     <!--Inventory table-->
       <div class="data-table">
         <h2>Inventory</h2>
@@ -115,6 +116,30 @@
        </div>
     </div>
 
+      <!-- Technician Filters-->
+      <div class="filter-section">
+        <div class="form-group">
+          <label for="tech-filter">Filter by Technician:</label>
+          <select id="tech-filter" v-model="techFilter.selectedTechId">
+            <option value="">All Technicians</option>
+            <option v-for="tech in technicians" :key="tech.TechID" :value="tech.TechID">
+              {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
+            </option>
+          </select>
+          <button 
+            v-if="techFilter.selectedTechId" 
+            @click="techFilter.selectedTechId = ''" 
+            class="btn-clear-filter"
+          >
+            Clear Filter
+          </button>
+        </div>
+      </div>
+
+      <!--Counter-->
+      <div v-if="techFilter.selectedTechId" class="filtered-results-count">
+        Showing {{ filteredTechnicianInventory.length }} items 
+      </div>
     <!-- Technician Inventory Tab -->
     <div v-if="activeTab === 'technicianInventory'" class="tab-content">
       <div class="actions">
@@ -141,7 +166,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="techItem in technicianInventory" :key="`${techItem.SKU_Number}-${techItem.TechID}`">
+            <tr v-for="techItem in filteredTechnicianInventory" :key="`${techItem.SKU_Number}-${techItem.TechID}`">
               <td>{{ techItem.SKU_Number }}</td>
               <td>{{ techItem.TechID }}</td>
               <td>{{ techItem.ItemName }}</td>
@@ -319,6 +344,11 @@ export default {
         selectedItems: [],
         quantities: {}
       },
+
+      techFilter: {
+      selectedTechId: ''  // For filtering by technician
+      },
+
       processingBulkAssign: false,
 
       // Loading and error states
@@ -370,6 +400,17 @@ export default {
        if (this.filteredInventoryItems.length === 0) return false;
        return this.filteredInventoryItems.every(item => this.bulkAssignForm.selectedItems.includes(item.SKU_Number));
     },
+
+    filteredTechnicianInventory() {
+    if (!this.techFilter.selectedTechId) {
+      return this.technicianInventory; // Return all if no filter selected
+    }
+    
+    return this.technicianInventory.filter(item => 
+      item.TechID === this.techFilter.selectedTechId
+    );
+    },
+
     connectionStatusMessage() {
       switch (this.connectionStatus) {
         case 'connected':
@@ -994,6 +1035,54 @@ export default {
   margin-right: 5px;
   font-size: 0.9em;
 }
-/* ... Add specific colors/borders for each button type if not already defined ... */
+
+/* Filter CSS */
+
+.filter-section {
+  margin: 1rem 0;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.filter-section .form-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-section label {
+  font-weight: bold;
+  margin-right: 0.5rem;
+}
+
+.filter-section select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-width: 250px;
+}
+
+.btn-clear-filter {
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-clear-filter:hover {
+  background-color: #e0e0e0;
+}
+
+/* Add a subtle highlight for filtered results */
+.filtered-results-count {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  color: #555;
+}
 
 </style>
