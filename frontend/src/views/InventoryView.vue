@@ -116,7 +116,15 @@
        </div>
     </div>
 
-      <!-- Technician Filters-->
+    <!-- Technician Inventory Tab -->
+    <div v-if="activeTab === 'technicianInventory'" class="tab-content">
+      <div class="actions">
+        <button v-if="isAdmin" @click="showBulkAssignForm = true" class="create-btn bulk-assign-btn">
+          Assign Items
+        </button>
+      </div>
+
+      <!-- Technician Filters - MOVED INSIDE THE TECHNICIAN INVENTORY TAB -->
       <div class="filter-section">
         <div class="form-group">
           <label for="tech-filter">Filter by Technician:</label>
@@ -136,16 +144,9 @@
         </div>
       </div>
 
-      <!--Counter-->
+      <!--Counter - MOVED INSIDE THE TECHNICIAN INVENTORY TAB -->
       <div v-if="techFilter.selectedTechId" class="filtered-results-count">
         Showing {{ filteredTechnicianInventory.length }} items 
-      </div>
-    <!-- Technician Inventory Tab -->
-    <div v-if="activeTab === 'technicianInventory'" class="tab-content">
-      <div class="actions">
-        <button v-if="isAdmin" @click="showBulkAssignForm = true" class="create-btn bulk-assign-btn">
-          Bulk Assign Items to Technician
-        </button>
       </div>
 
       <div class="data-table">
@@ -282,49 +283,49 @@
            </div>
          </div>
        </div>
-    </div>
 
-  <!--Inventory Create Form-->
-    <div v-if="showTechInventoryCreateForm" class="modal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>{{ editingTechInventory ? 'Edit Technician Assignment' : 'Assign Item to technician' }}</h3>
-            <button @click="cancelTechInventoryForm" class="close-btn">&times;</button>
+      <!--Inventory Create Form-->
+      <div v-if="showTechInventoryCreateForm" class="modal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>{{ editingTechInventory ? 'Edit Technician Assignment' : 'Assign Item to technician' }}</h3>
+              <button @click="cancelTechInventoryForm" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+              <form @submit.prevent="saveTechInventory">
+                <div class="form-group">
+                  <label>Item:</label>
+                  <select v-model="techInventoryForm.SKU_Number" required>
+                    <option value="">Select an item</option>
+                    <option v-for="item in inventory" :key="item.SKU_Number" :value="item.SKU_Number">
+                      {{ item.ItemName }} ({{ item.SKU_Number }})
+                    </option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Technician:</label>
+                  <select v-model="techInventoryForm.TechID" required>
+                    <option value="">Select a technician</option>
+                    <option v-for="tech in technicians" :key="tech.TechID" :value="tech.TechID">
+                      {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
+                    </option>
+                  </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity:</label>
+                    <input type="number" v-model.number="techInventoryForm.QTY" min="1" required />
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="btn-save">Assign</button>
+                  <button type="button" @click="cancelTechInventoryForm" class="btn-cancel">Cancel</button>
+                </div>
+              </form>
+            </div>
           </div>
-          <div class="modal-body">
-            <form @submit.prevent="saveTechInventory">
-              <div class="form-group">
-                <label>Item:</label>
-                <select v-model="techInventoryForm.SKU_Number" required>
-                  <option value="">Select an item</option>
-                  <option v-for="item in inventory" :key="item.SKU_Number" :value="item.SKU_Number">
-                    {{ item.ItemName }} ({{ item.SKU_Number }})
-                  </option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Technician:</label>
-                <select v-model="techInventoryForm.TechID" required>
-                  <option value="">Select a technician</option>
-                  <option v-for="tech in technicians" :key="tech.TechID" :value="tech.TechID">
-                    {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
-                  </option>
-                </select>
-              </div>
-              <div class="form-group">
-                  <label>Quantity:</label>
-                  <input type="number" v-model.number="techInventoryForm.QTY" min="1" required />
-              </div>
-              <div class="form-actions">
-                <button type="submit" class="btn-save">Assign</button>
-                <button type="button" @click="cancelTechInventoryForm" class="btn-cancel">Cancel</button>
-              </div>
-            </form>
-          </div>
+      </div>
+    </div>
   </div>
-  </div>
-  </div>
-  </template>
+</template>
 
 <script>
 import "@/assets/css/style.css"; // Adjust path as needed

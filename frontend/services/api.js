@@ -150,24 +150,88 @@ export default {
     return this.fetchData('/inventory');
   },
 
-  async addOrderItem(orderId, skuNumber) {
-    return this.fetchData('/orderitems', {
+  async getInventoryItem(sku) {
+    return this.fetchData(`/inventory/${sku}`);
+  },
+  
+  async createInventoryItem(itemData) {
+    return this.fetchData('/inventory', {
       method: 'POST',
-      body: JSON.stringify({
-        orderID: orderId,
-        skuNumber: skuNumber
-      })
+      body: JSON.stringify(itemData)
     });
   },
-
-  async deleteOrderItem(orderId, skuNumber) {
-    return this.fetchData(`/orderitems/${orderId}/${skuNumber}`, {
+  
+  async updateInventoryItem(sku, itemData) {
+    return this.fetchData(`/inventory/${sku}`, {
+      method: 'PUT',
+      body: JSON.stringify(itemData)
+    });
+  },
+  
+  async deleteInventoryItem(sku) {
+    return this.fetchData(`/inventory/${sku}`, {
       method: 'DELETE'
     });
   },
 
-  async getInventoryItem(sku) {
-    return this.fetchData(`/inventory/${sku}`);
+  // --------- TECH INVENTORY ---------
+  async getTechInventory() {
+    return this.fetchData('/techinventory');
+  },
+  
+  async assignTechInventory(techInventoryData) {
+    return this.fetchData('/techinventory', {
+      method: 'POST',
+      body: JSON.stringify(techInventoryData)
+    });
+  },
+  
+  async updateTechInventory(oldSku, oldTechId, updateData) {
+    return this.fetchData(`/techinventory/${oldSku}/${oldTechId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+  },
+  
+  async deleteTechInventory(sku, techId) {
+    return this.fetchData(`/techinventory/${sku}/${techId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // --------- ORDER ITEMS ---------
+  async getOrderItems() {
+    return this.fetchData('/orderitems');
+  },
+  
+  async getOrderItemsForOrder(orderId) {
+    return this.fetchData(`/orders/${orderId}/items`);
+  },
+
+  async addOrderItem(orderItemData) {
+    return this.fetchData('/orderitems', {
+      method: 'POST',
+      body: JSON.stringify(orderItemData)
+    });
+  },
+  
+  async updateOrderItem(orderId, sku, updateData) {
+    return this.fetchData(`/orderitems/${orderId}/${sku}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData)
+    });
+  },
+
+  async deleteOrderItem(orderId, sku) {
+    return this.fetchData(`/orderitems/${orderId}/${sku}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  async deleteAllOrderItems(orderId) {
+    return this.fetchData(`/orderitems/${orderId}`, {
+      method: 'DELETE'
+    });
   },
 
   // --------- ORDERS ---------
@@ -179,6 +243,26 @@ export default {
     return this.fetchData(`/orders/${id}`);
   },
   
+  async createOrder(orderData) {
+    return this.fetchData('/orders', {
+      method: 'POST',
+      body: JSON.stringify(orderData)
+    });
+  },
+  
+  async updateOrder(id, orderData) {
+    return this.fetchData(`/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(orderData)
+    });
+  },
+  
+  async deleteOrder(id) {
+    return this.fetchData(`/orders/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
   // --------- CUSTOMERS ---------
   async getCustomers() {
     return this.fetchData('/customers');
@@ -186,6 +270,31 @@ export default {
   
   async getCustomer(id) {
     return this.fetchData(`/customers/${id}`);
+  },
+  
+  async createCustomer(customerData) {
+    return this.fetchData('/customers', {
+      method: 'POST',
+      body: JSON.stringify(customerData)
+    });
+  },
+  
+  async updateCustomer(id, customerData) {
+    return this.fetchData(`/customer/${id}`, { // Note: Your backend uses singular 'customer' here
+      method: 'PUT',
+      body: JSON.stringify(customerData)
+    });
+  },
+  
+  async deleteCustomer(id) {
+    return this.fetchData(`/customers/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  // --------- ADMINS ---------
+  async getAdmins() {
+    return this.fetchData('/admins');
   },
   
   // --------- AUTHENTICATION ---------

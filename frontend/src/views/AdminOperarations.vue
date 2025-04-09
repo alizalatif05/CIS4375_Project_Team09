@@ -14,19 +14,19 @@
         :class="{ active: activeTab === 'technicians' }"
         @click="activeTab = 'technicians'"
       >
-        Technician Management
+        All Technicians
       </button>
       <button
         :class="{ active: activeTab === 'salesreps' }"
         @click="activeTab = 'salesreps'"
       >
-        Sales Representatives
+       All Sales Representatives
       </button>
       <button
         :class="{ active: activeTab === 'users' }"
         @click="activeTab = 'users'"
       >
-        User Management
+        User Profile Management
       </button>
     </div>
 

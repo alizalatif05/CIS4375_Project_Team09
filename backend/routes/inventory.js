@@ -113,6 +113,29 @@ router.get('/technicians', authenticateUser, async (req, res) => {
     }
 });
 
+
+/**
+ * DELETE /api/technicians/:id - Soft delete a technician
+ */
+router.delete('/technicians/:id', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting technician with ID:', req.params.id);
+        const query = 'UPDATE Technician SET Deleted = "Yes" WHERE TechID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No technician found with ID:', req.params.id);
+            return res.status(404).json({ message: 'Technician not found' });
+        }
+        
+        console.log('Successfully deleted technician with ID:', req.params.id);
+        res.json({ message: 'Technician soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
 /**
  * GET /api/techinventory - Retrieve all active technician inventory items with quantity
  */
@@ -418,6 +441,28 @@ router.get('/sales_reps/:id', authenticateUser, async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/sales_reps/:id - Soft delete a sales representative
+ */
+router.delete('/sales_reps/:id', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting sales rep with ID:', req.params.id);
+        const query = 'UPDATE SalesRep SET Deleted = "Yes" WHERE SalesRepID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No sales rep found with ID:', req.params.id);
+            return res.status(404).json({ message: 'Sales representative not found' });
+        }
+        
+        console.log('Successfully deleted sales rep with ID:', req.params.id);
+        res.json({ message: 'Sales representative soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
 /** 
  *  USER ROUTES
  */
@@ -467,6 +512,27 @@ router.post('/user', authenticateUser, authorizeAdmin, async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/users/:id - Soft delete a user
+ */
+router.delete('/users/:id', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        console.log('Deleting user with ID:', req.params.id);
+        const query = 'UPDATE User SET Deleted = "Yes" WHERE UserID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No user found with ID:', req.params.id);
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        console.log('Successfully deleted user with ID:', req.params.id);
+        res.json({ message: 'User soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
 /**
  * PUT /api/inventory/:id - Update an existing inventory item
  */
@@ -1132,7 +1198,9 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
              await connection.rollback(); // Rollback transaction
             return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
         }
-        const quantityToRemove = techInvRows[0].Quantity;
+        
+        // FIX: Use correct property name - QTY instead of Quantity
+        const quantityToRemove = techInvRows[0].QTY;
 
         // 2. Soft delete the TechInventory record (set Deleted='Yes', Quantity=0)
         const [result] = await connection.query(
@@ -1161,7 +1229,6 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
              // For stricter consistency, fail the whole operation.
              return res.status(404).json({ message: `Assignment removed, but failed to return quantity: Inventory item SKU ${sku} not found or is deleted.`});
          }
-
 
         await connection.commit(); // Commit transaction
         console.log(`Successfully removed assignment for SKU ${sku} from Tech ${techId}, returned ${quantityToRemove} to inventory.`);
