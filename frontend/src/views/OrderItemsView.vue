@@ -350,6 +350,23 @@ export default {
       }
     },
 
+        // editOrder method - Sets up the form for editing an existing order
+    editOrder(order) {
+      // Store the order being edited
+      this.editingOrder = order;
+      
+      // Populate the form with the order's current data
+      this.orderForm = {
+        CustomerID: order.CustomerID,
+        SalesRepID: order.SalesRepID,
+        TechID: order.TechID,
+        Items: [] // Items are handled separately
+      };
+      
+      // Display the edit form modal
+      this.showOrderCreateForm = true;
+    },
+
     // Calculates the maximum quantity allowed for an item being edited, based on available inventory.
     getMaxQuantityForEdit() {
       if (!this.editItemForm.SKU_Number) return 1;

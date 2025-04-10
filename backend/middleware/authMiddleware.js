@@ -1,11 +1,11 @@
-// middleware/authMiddleware.js
+//middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const pool = require('../db');
 
 dotenv.config();
 
-// Authenticate any logged-in user (admin or regular)
+// Authenticate any user 
 const authenticateUser = async (req, res, next) => {
     const token = req.header('Authorization');
     

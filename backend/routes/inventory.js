@@ -1,9 +1,9 @@
-// routes/inventory.js - FIXED VERSION
+// routes/inventory.js 
 
 const express = require('express'); 
 const pool = require('../db'); 
 const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddleware');
-
+const bcrypt = require('bcrypt');
 const router = express.Router(); 
 
 /** 
@@ -487,6 +487,7 @@ router.get('/user/:id', authenticateUser, async (req, res) => {
     }
 });
 
+// Create user and hash password
 router.post('/user', authenticateUser, authorizeAdmin, async (req, res) => {
     try {
         const { User_fName, User_lName, Username, UserPassword, UserType } = req.body;
@@ -495,11 +496,14 @@ router.post('/user', authenticateUser, authorizeAdmin, async (req, res) => {
             return res.status(400).json({ message: 'Missing required fields'});
         }
 
+        // Hash the password with bcrypt before storing it
+        const hashedPassword = await bcrypt.hash(UserPassword, 10);
+
         const user = {
             User_fName,
             User_lName,
             Username,
-            UserPassword,
+            UserPassword: hashedPassword, // Store the hashed password
             UserType,
             Deleted: 'No'
         };
@@ -649,9 +653,7 @@ router.put('/orders/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/**
- * PUT /api/users/:id - Update a user's information
- */
+// Update user and hash password if provided
 router.put('/users/:id', authenticateUser, async (req, res) => {
     try {
         const userId = req.params.id;
@@ -665,12 +667,15 @@ router.put('/users/:id', authenticateUser, async (req, res) => {
         const values = [];
 
         if (UserPassword) {
+            // Hash the password if it's provided
+            const hashedPassword = await bcrypt.hash(UserPassword, 10);
+            
             query = `
                 UPDATE User
                 SET User_fName = ?, User_lName = ?, Username = ?, UserPassword = ?, UserType = ?, Deleted = ?
                 WHERE UserID = ?;
             `;
-            values.push(User_fName, User_lName, Username, UserPassword, UserType, Deleted || 'No', userId);
+            values.push(User_fName, User_lName, Username, hashedPassword, UserType, Deleted || 'No', userId);
         } else {
             query = `
                 UPDATE User
