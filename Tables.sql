@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS Inventory (
     SKU_Number INT PRIMARY KEY AUTO_INCREMENT,
     ItemName VARCHAR(255) NOT NULL,
     Item_Desc TEXT,
-    Item_Quantity INT NOT NULL,
+    Item_Quantity INT,
     Deleted ENUM('Yes', 'No') DEFAULT 'No'
 );
 
@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS `Order` (
 CREATE TABLE IF NOT EXISTS OrderItems (
     SKU_Number INT NOT NULL,
     OrderID INT NOT NULL,
+    OrderItems_Quantity INT,
     Deleted ENUM('Yes', 'No') DEFAULT 'No',
     PRIMARY KEY (SKU_Number, OrderID),
     FOREIGN KEY (SKU_Number) REFERENCES Inventory(SKU_Number) ON DELETE CASCADE,
@@ -76,7 +77,7 @@ CREATE TABLE IF NOT EXISTS OrderItems (
 CREATE TABLE IF NOT EXISTS TechInventory (
     SKU_Number INT NOT NULL,
     TechID INT NOT NULL,
-    Item_Quantity INT NOT NULL,
+    Item_Quantity INT,
     Deleted ENUM('Yes', 'No') DEFAULT 'No',
     PRIMARY KEY (SKU_Number, TechID),
     FOREIGN KEY (SKU_Number) REFERENCES Inventory(SKU_Number) ON DELETE CASCADE,
