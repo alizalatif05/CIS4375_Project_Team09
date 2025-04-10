@@ -1,80 +1,183 @@
-// routes/auth.js
+// routes/auth.js - Updated with password hashing
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+const bcrypt = require('bcrypt'); // Add bcrypt
+const pool = require('../db');
+const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddleware');
 
-// Import required modules
-const express = require('express'); // Express framework for handling routes
-const jwt = require('jsonwebtoken'); // JSON Web Token library for authentication
-const bcrypt = require('bcryptjs'); // Library for hashing passwords securely
-const dotenv = require('dotenv'); // Environment variable management
-const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddleware'); // Middleware for token validation
+dotenv.config();
+const router = express.Router();
+const SALT_ROUNDS = 10; // Standard salt rounds for bcrypt
 
-dotenv.config(); // Load environment variables from .env file
-
-const router = express.Router(); // Create an Express router
-
-// Temporary mock user data (to be replaced with database connection later)
-const users = [
-    { username: 'admin', password: '', isAdmin: true }, // Placeholder admin
-    { username: 'user', password: '', isAdmin: false } // Placeholder non-admin
-];
-
-/**
- * Register a new user
- *
- * This route allows a user to register with a username, password, and role (admin or non-admin).
- * The password is hashed before storing to ensure security.
- * @route POST /api/auth/register
- */
-router.post('/register', async (req, res) => {
-    const { username, password, isAdmin } = req.body;
+// Admin route to add new users 
+router.post('/add-user', authenticateUser, authorizeAdmin, async (req, res) => {
+    const { username, password, userType } = req.body;
+    
     if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' }); // Validate input
+        return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password with bcrypt
-    users.push({ username, password: hashedPassword, isAdmin: isAdmin || false }); // Store user data with role
-    res.status(201).json({ message: 'User registered successfully' }); // Respond with success
+    try {
+        // Check if user already exists
+        const [existingUsers] = await pool.query(
+            'SELECT * FROM user WHERE Username = ?', 
+            [username]
+        );
+
+        if (existingUsers.length > 0) {
+            return res.status(409).json({ message: 'User already exists' });
+        }
+
+        // Hash the password before storing
+        const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+        // Insert new user with hashed password
+        const [result] = await pool.query(
+            'INSERT INTO user (Username, UserPassword, UserType, Deleted) VALUES (?, ?, ?, "No")', 
+            [username, hashedPassword, userType || 'User']
+        );
+
+        res.status(201).json({ 
+            message: 'User added successfully',
+            userId: result.insertId 
+        });
+    } catch (error) {
+        console.error('User creation error:', error);
+        res.status(500).json({ message: 'Server error while adding user' });
+    }
 });
 
-/**
- * Login user
- *
- * This route allows an existing user to log in with a username and password.
- * If valid, a JWT token is generated and returned for authentication.
- * @route POST /api/auth/login
- */
+// Admin-specific login endpoint
+router.post('/admin-login', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        // Find user in the database with admin check
+        const [users] = await pool.query(
+            'SELECT * FROM user WHERE Username = ? AND UserType = "Admin" AND Deleted = "No"', 
+            [username]
+        );
+
+        // Check if admin user exists
+        if (users.length === 0) {
+            return res.status(401).json({ message: 'Invalid admin credentials' });
+        }
+
+        const user = users[0];
+        
+        // Compare the provided password with the stored hash
+        const passwordMatch = await bcrypt.compare(password, user.UserPassword);
+        
+        if (!passwordMatch) {
+            return res.status(401).json({ message: 'Invalid admin credentials' });
+        }
+
+        // Generate JWT token for admin
+        const token = jwt.sign(
+            { 
+                userId: user.UserID,
+                username: user.Username, 
+                isAdmin: true
+            }, 
+            process.env.JWT_SECRET || 'supersecretkey', 
+            { expiresIn: '8h' }
+        );
+
+        // Return token and admin user info
+        res.json({ 
+            token, 
+            isAdmin: true,
+            user: {
+                UserID: user.UserID,
+                Username: user.Username,
+                UserType: user.UserType
+            }
+        });
+    } catch (error) {
+        console.error('Admin login error:', error);
+        res.status(500).json({ message: 'Server error during admin login' });
+    }
+});
+
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
-    const user = users.find(u => u.username === username);
-    
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ message: 'Invalid credentials' }); // Validate password
+
+    try {
+        // Find user in the database
+        const [users] = await pool.query(
+            'SELECT * FROM user WHERE Username = ? AND Deleted = "No"', 
+            [username]
+        );
+
+        // Check if user exists
+        if (users.length === 0) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const user = users[0];
+        
+        // Compare the provided password with the stored hash
+        const passwordMatch = await bcrypt.compare(password, user.UserPassword);
+        
+        if (!passwordMatch) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                userId: user.UserID,
+                username: user.Username, 
+                isAdmin: user.UserType === 'Admin'
+            }, 
+            process.env.JWT_SECRET || 'supersecretkey', 
+            { expiresIn: '8h' }
+        );
+
+        // Return token and user info
+        res.json({ 
+            token, 
+            isAdmin: user.UserType === 'Admin',
+            user: {
+                UserID: user.UserID,
+                Username: user.Username,
+                UserType: user.UserType
+            }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error during login' });
     }
-
-    // Generate JWT token with user role (admin or non-admin)
-    const token = jwt.sign({ username: user.username, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, isAdmin: user.isAdmin }); // Return token and role to client
 });
 
-/**
- * Protected Route Example
- *
- * This route requires a valid JWT token to access.
- * If authenticated, it returns user information.
- * @route GET /api/auth/protected
- */
+// Other routes remain the same
+router.get('/user', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM User');
+        res.json(results);
+    } catch (err) {
+        console.error('Database query error:', err);
+        res.status(500).json({ message: 'Database query error' });
+    }
+});
+
+router.get('/user/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM User WHERE UserID = ?', [req.params.id]);
+        res.json(results[0] || {});
+    } catch (err) {
+        console.error('Database query error:', err);
+        res.status(500).json({ message: 'Database query error' });
+    }
+});
+
 router.get('/protected', authenticateUser, (req, res) => {
-    res.json({ message: 'Protected route accessed', user: req.user }); // Return user data
+    res.json({ message: 'Protected route accessed', user: req.user });
 });
 
-/**
- * Admin-Only Route Example
- *
- * This route is restricted to users with the admin role.
- * @route GET /api/auth/admin
- */
 router.get('/admin', authenticateUser, authorizeAdmin, (req, res) => {
     res.json({ message: 'Admin route accessed', user: req.user });
 });
 
-module.exports = router; // Export the router
-
+module.exports = router;

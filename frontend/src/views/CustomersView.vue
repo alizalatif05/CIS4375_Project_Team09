@@ -25,23 +25,26 @@
             <th>First Name</th>
             <th>Last Name</th>
             <th>Address</th>
-            <th>Phone Number</th>
+            <th>Phone</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="customer in customers" :key="customer.CustomerID">
             <td>{{ customer.CustomerID }}</td>
-            <td>{{ customer.FirstName }}</td>
-            <td>{{ customer.LastName }}</td>
-            <td>{{ customer.Address }}</td>
-            <td>{{ customer.PhoneNumber }}</td>
+            <td>{{ customer.firstName }}</td>
+            <td>{{ customer.lastName }}</td>
+            <td>{{ customer.address }}</td>
+            <td>{{ customer.phone }}</td>
             <td>
               <button @click="viewCustomerDetails(customer)" class="btn-view">
                 View
               </button>
               <button @click="editCustomer(customer)" class="btn-edit">
                 Edit
+              </button>
+              <button @click="deleteCustomer(customer.CustomerID)" class="btn-delete">
+                Delete
               </button>
             </td>
           </tr>
@@ -60,19 +63,19 @@
           <form @submit.prevent="saveCustomer">
             <div class="form-group">
               <label>First Name:</label>
-              <input v-model="customerForm.FirstName" required />
+              <input v-model="customerForm.Customer_fName" type="text" required />
             </div>
             <div class="form-group">
               <label>Last Name:</label>
-              <input v-model="customerForm.LastName" required />
+              <input v-model="customerForm.Customer_lName" type="text" required />
             </div>
             <div class="form-group">
               <label>Address:</label>
-              <input v-model="customerForm.Address" required />
+              <input v-model="customerForm.CustomerAddress" type="text" required />
             </div>
             <div class="form-group">
-              <label>Phone Number:</label>
-              <input v-model="customerForm.PhoneNumber" required />
+              <label>Phone:</label>
+              <input v-model="customerForm.CustomerPhone" type="text" required />
             </div>
             <div class="form-actions">
               <button type="submit" class="btn-save">Save</button>
@@ -93,13 +96,14 @@
         <div class="modal-body">
           <div class="details-section">
             <p><strong>ID:</strong> {{ selectedCustomer.CustomerID }}</p>
-            <p><strong>First Name:</strong> {{ selectedCustomer.FirstName }}</p>
-            <p><strong>Last Name:</strong> {{ selectedCustomer.LastName }}</p>
-            <p><strong>Address:</strong> {{ selectedCustomer.Address }}</p>
-            <p><strong>Phone Number:</strong> {{ selectedCustomer.PhoneNumber }}</p>
+            <p><strong>First Name:</strong> {{ selectedCustomer.firstName }}</p>
+            <p><strong>Last Name:</strong> {{ selectedCustomer.lastName }}</p>
+            <p><strong>Address:</strong> {{ selectedCustomer.address }}</p>
+            <p><strong>Phone:</strong> {{ selectedCustomer.phone }}</p>
           </div>
           <div class="form-actions">
             <button @click="editCustomer(selectedCustomer)" class="btn-edit">Edit</button>
+            <button @click="selectedCustomer = null" class="btn-cancel">Close</button>
           </div>
         </div>
       </div>
@@ -109,7 +113,7 @@
 
 <script>
 import "@/assets/css/style.css";
-import api from '../../../backend/services/api.js';
+import api from '../../services/api.js';
 
 export default {
   data() {
@@ -130,10 +134,10 @@ export default {
       editingCustomer: null,
       showCustomerCreateForm: false,
       customerForm: {
-        FirstName: '',
-        LastName: '',
-        Address: '',
-        PhoneNumber: ''
+        Customer_fName: '',
+        Customer_lName: '',
+        CustomerAddress: '',
+        CustomerPhone: ''
       }
     };
   },
@@ -164,7 +168,6 @@ export default {
         const result = await api.testConnection();
         this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
 
-        // Auto-hide success message after 3 seconds
         if (this.connectionStatus === 'connected') {
           setTimeout(() => {
             this.connectionStatus = null;
@@ -180,7 +183,6 @@ export default {
     async loadCustomers() {
       this.loading.customers = true;
       this.error.customers = null;
-
       try {
         this.customers = await api.getCustomers();
       } catch (error) {
@@ -199,22 +201,43 @@ export default {
     // Edit customer
     editCustomer(customer) {
       this.editingCustomer = customer;
-      this.customerForm = { ...customer };
-
-      // If a customer was being viewed, close the view modal
+      this.customerForm = {
+        Customer_fName: customer.firstName,  // Maps from API response to form field
+        Customer_lName: customer.lastName,
+        CustomerAddress: customer.address,
+        CustomerPhone: customer.phone
+      };
+      this.showCustomerCreateForm = true;
       this.selectedCustomer = null;
     },
 
     // Save customer
     async saveCustomer() {
       try {
-        if (this.editingCustomer) {
-          await api.updateCustomer(this.editingCustomer.CustomerID, this.customerForm);
-        } else {
-          await api.createCustomer(this.customerForm);
-        }
+        const customerData = {
+          firstName: this.customerForm.Customer_fName,
+          lastName: this.customerForm.Customer_lName,
+          address: this.customerForm.CustomerAddress,
+          phone: this.customerForm.CustomerPhone
+        };
 
-        // Refresh the customers list
+        if (this.editingCustomer) {
+          await api.fetchData(`/customers/${this.editingCustomer.CustomerID}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(customerData)
+          });
+        } else {
+          await api.fetchData('/customers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(customerData)
+          });
+        }
         await this.loadCustomers();
         this.cancelCustomerForm();
       } catch (error) {
@@ -223,15 +246,30 @@ export default {
       }
     },
 
+    // Delete customer
+    async deleteCustomer(customerID) {
+      if (confirm('Are you sure you want to delete this customer?')) {
+        try {
+          await api.fetchData(`/customers/${customerID}`, {
+            method: 'DELETE'
+          });
+          await this.loadCustomers();
+        } catch (error) {
+          console.error('Error deleting customer:', error);
+          alert(`Error deleting customer: ${error.message}`);
+        }
+      }
+    },
+
     // Cancel customer form
     cancelCustomerForm() {
       this.editingCustomer = null;
       this.showCustomerCreateForm = false;
       this.customerForm = {
-        FirstName: '',
-        LastName: '',
-        Address: '',
-        PhoneNumber: ''
+        firstName: '',
+        lastName: '',
+        address: '',
+        phone: ''
       };
     }
   }

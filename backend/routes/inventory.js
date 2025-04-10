@@ -1,9 +1,9 @@
-// routes/inventory.js
+// routes/inventory.js 
 
 const express = require('express'); 
 const pool = require('../db'); 
 const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddleware');
-
+const bcrypt = require('bcrypt');
 const router = express.Router(); 
 
 /** 
@@ -13,146 +13,386 @@ const router = express.Router();
 /**
  * GET /api/inventory - Retrieve all inventory items
  */
-router.get('/inventory', authenticateUser, (req, res) => {
-    const { search } = req.query;
-    let query = `
-        SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
-        FROM Inventory
-        WHERE Deleted = 'No'
-    `;
+router.get('/inventory', authenticateUser, async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query = `
+            SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
+            FROM Inventory
+            WHERE Deleted = 'No'
+        `;
 
-    const values = [];
+        const values = [];
 
-    if (search) {
-        query += " AND (SKU_Number LIKE ? OR ItemName LIKE ?)";
-        values.push(`%${search}%`, `%${search}%`);
-    }
+        if (search) {
+            query += " AND (SKU_Number LIKE ? OR ItemName LIKE ?)";
+            values.push(`%${search}%`, `%${search}%`);
+        }
 
-    pool.query(query, values, (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [results] = await pool.query(query, values);
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching inventory:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  * GET /api/inventory/:sku - Retrieve a single inventory item by SKU
  */
-router.get('/inventory/:sku', authenticateUser, (req, res) => {
-    const query = `
-        SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
-        FROM Inventory 
-        WHERE SKU_Number = ? AND Deleted = 'No';
-    `;
-    pool.query(query, [req.params.sku], (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+router.get('/inventory/:sku', authenticateUser, async (req, res) => {
+    try {
+        const query = `
+            SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
+            FROM Inventory 
+            WHERE SKU_Number = ? AND Deleted = 'No';
+        `;
+        const [results] = await pool.query(query, [req.params.sku]);
         res.json(results[0] || {});
-    });
+    } catch (err) {
+        console.error('Error fetching inventory item:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
+
 
 /** 
  *  CUSTOMER ROUTES
  */
 
-router.get('/customers', authenticateUser, (req, res) => {
-    const { search } = req.query;
-    let query = `
-        SELECT CustomerID, Customer_fName AS firstName, Customer_lName AS lastName, 
-               CustomerAddress AS address, CustomerPhone AS phone 
-        FROM Customer
-        WHERE Deleted = 'No'
-    `;
+router.get('/customers', authenticateUser, async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query = `
+            SELECT CustomerID, Customer_fName AS firstName, Customer_lName AS lastName, 
+                CustomerAddress AS address, CustomerPhone AS phone 
+            FROM Customer
+            WHERE Deleted = 'No'
+        `;
 
-    const values = [];
+        const values = [];
 
-    if (search) {
-        query += " AND (CustomerID LIKE ? OR Customer_fName LIKE ? OR Customer_lName LIKE ?)";
-        values.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
+        if (search) {
+            query += " AND (CustomerID LIKE ? OR Customer_fName LIKE ? OR Customer_lName LIKE ?)";
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
 
-    pool.query(query, values, (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [results] = await pool.query(query, values);
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching customers:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  *  TECHNICIAN ROUTES
   */
 
-router.get('/technicians', authenticateUser, (req, res) => {
-    const { search } = req.query;
-    let query = `
-        SELECT TechID, UserID, Tech_fName AS firstName, Tech_lName AS lastName 
-        FROM Technician
-        WHERE Deleted = 'No'
-    `;
+router.get('/technicians', authenticateUser, async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query = `
+            SELECT TechID, UserID, Tech_fName AS firstName, Tech_lName AS lastName 
+            FROM Technician
+            WHERE Deleted = 'No'
+        `;
 
-    const values = [];
+        const values = [];
 
-    if (search) {
-        query += " AND (TechID LIKE ? OR Tech_fName LIKE ? OR Tech_lName LIKE ?)";
-        values.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
+        if (search) {
+            query += " AND (TechID LIKE ? OR Tech_fName LIKE ? OR Tech_lName LIKE ?)";
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
 
-    pool.query(query, values, (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [results] = await pool.query(query, values);
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching technicians:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 
 /**
- * GET /api/techinventory - Retrieve all technician inventory items
+ * DELETE /api/technicians/:id - Soft delete a technician
  */
-router.get('/techinventory', authenticateUser, (req, res) => {
-    const query = `
-        SELECT TechInventory.SKU_Number, TechInventory.TechID, 
-               Inventory.ItemName, Inventory.Item_Desc 
-        FROM TechInventory
-        JOIN Inventory ON TechInventory.SKU_Number = Inventory.SKU_Number
-        WHERE TechInventory.Deleted = 'No';
-    `;
-    
-    pool.query(query, (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json(results);
-    });
+router.delete('/technicians/:id', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting technician with ID:', req.params.id);
+        const query = 'UPDATE Technician SET Deleted = "Yes" WHERE TechID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No technician found with ID:', req.params.id);
+            return res.status(404).json({ message: 'Technician not found' });
+        }
+        
+        console.log('Successfully deleted technician with ID:', req.params.id);
+        res.json({ message: 'Technician soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
+
+/**
+ * GET /api/techinventory - Retrieve all active technician inventory items with quantity
+ */
+router.get('/techinventory', authenticateUser, async (req, res) => {
+    try {
+        // Select Quantity from TechInventory table
+        const query = `
+            SELECT
+                ti.SKU_Number,
+                ti.TechID,
+                ti.QTY,
+                i.ItemName,
+                i.Item_Desc
+            FROM TechInventory ti
+            JOIN Inventory i ON ti.SKU_Number = i.SKU_Number
+            WHERE ti.Deleted = 'No' AND i.Deleted = 'No';
+        `;
+        const [results] = await pool.query(query);
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching tech inventory:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+// Put for inventory edit updates
+
+router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, res) => {
+    try {
+        const { oldSku, oldTechId } = req.params;
+        const { newTechId, QTY, newSkuNumber } = req.body;
+        
+        // Validate parameters
+        if (!QTY && !newTechId && !newSkuNumber) {
+            return res.status(400).json({ message: 'At least one field to update is required' });
+        }
+        
+        // Get a connection for transaction
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+        
+        try {
+            // First, get the current quantity assigned to the technician
+            const [currentRows] = await connection.query(
+                'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+                [oldSku, oldTechId]
+            );
+            
+            if (!currentRows || currentRows.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
+            }
+            
+            const currentQty = currentRows[0].QTY;
+            
+            // Start building the query
+            let query = 'UPDATE TechInventory SET ';
+            const values = [];
+            const updates = [];
+            
+            // Calculate quantity difference and update inventory if needed
+            if (QTY) {
+                const newQty = parseInt(QTY);
+                const qtyDifference = newQty - currentQty;
+                
+                // If increasing quantity, check if enough inventory is available
+                if (qtyDifference > 0) {
+                    const [invRows] = await connection.query(
+                        'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
+                        [oldSku]
+                    );
+                    
+                    if (!invRows || invRows.length === 0 || invRows[0].Item_Quantity < qtyDifference) {
+                        await connection.rollback();
+                        return res.status(400).json({ 
+                            message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.Item_Quantity ?? 0}` 
+                        });
+                    }
+                }
+                
+                updates.push('QTY = ?');
+                values.push(newQty);
+                
+                // Update main inventory - subtract if increasing, add if decreasing
+                if (qtyDifference !== 0) {
+                    await connection.query(
+                        'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                        [qtyDifference, oldSku]
+                    );
+                }
+            }
+            
+            // Add new tech ID if provided
+            if (newTechId) {
+                updates.push('TechID = ?');
+                values.push(newTechId);
+            }
+            
+            // Complete the query
+            query += updates.join(', ');
+            query += ' WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"';
+            values.push(oldSku, oldTechId);
+            
+            // Execute the update
+            const [result] = await connection.query(query, values);
+            
+            if (result.affectedRows === 0) {
+                await connection.rollback();
+                return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
+            }
+            
+            await connection.commit();
+            
+            res.json({
+                message: 'Technician inventory updated successfully',
+                affectedRows: result.affectedRows
+            });
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    } catch (err) {
+        console.error('Error updating technician inventory:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
 
 /** 
  *  ORDER ROUTES
  */
 
-router.get('/orders', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM `Order` WHERE Deleted = "No"', (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+// Get all orders
+router.get('/orders', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM `Order` WHERE Deleted = "No"');
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching orders:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
-router.get('/orders/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM Orders WHERE OrderID = ?', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+// Get a specific order
+router.get('/orders/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM `Order` WHERE OrderID = ?', [req.params.id]);
         res.json(results[0] || {});
-    });
+    } catch (err) {
+        console.error('Error fetching order by ID:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
+
+// Get items for a specific order
+router.get('/orders/:id/items', authenticateUser, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const query = `
+            SELECT oi.SKU_Number, oi.OrderID, oi.QTY, 
+                i.ItemName, i.Item_Desc 
+            FROM OrderItems oi
+            JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
+            WHERE oi.OrderID = ? AND oi.Deleted = 'No';
+        `;
+
+        const [results] = await pool.query(query, [orderId]);
+        res.json(results); // Return array of items
+    } catch (err) {
+        console.error('Error fetching items for order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+// Get all order items
+router.get('/orderitems', authenticateUser, async (req, res) => {
+    try {
+        const query = `
+            SELECT OrderItems.SKU_Number, OrderItems.OrderID, OrderItems.QTY,
+                Inventory.ItemName, Inventory.Item_Desc 
+            FROM OrderItems
+            JOIN Inventory ON OrderItems.SKU_Number = Inventory.SKU_Number
+            WHERE OrderItems.Deleted = 'No';
+        `;
+
+        const [results] = await pool.query(query);
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching order items:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
 
 /**
- * GET /api/orderitems - Retrieve all order items
+ * PUT /api/orderitems/:orderId/:sku - Update a specific order item
  */
-router.get('/orderitems', authenticateUser, (req, res) => {
-    const query = `
-        SELECT OrderItems.SKU_Number, OrderItems.OrderID, 
-               Inventory.ItemName, Inventory.Item_Desc 
-        FROM OrderItems
-        JOIN Inventory ON OrderItems.SKU_Number = Inventory.SKU_Number
-        WHERE OrderItems.Deleted = 'No';
-    `;
-
-    pool.query(query, (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json(results);
-    });
+router.put('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
+    try {
+        const { orderId, sku } = req.params;
+        const { skuNumber, QTY } = req.body;
+        
+        // Validate input
+        if (!QTY || QTY < 1) {
+            return res.status(400).json({ message: 'Quantity must be at least 1' });
+        }
+        
+        const connection = await pool.getConnection();
+        
+        try {
+            // First check if the item being edited exists
+            const [currentItem] = await connection.query(
+                'SELECT * FROM OrderItems WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                [orderId, sku]
+            );
+            
+            if (!currentItem || currentItem.length === 0) {
+                return res.status(404).json({ message: 'Order item not found' });
+            }
+            
+            // If we're changing the SKU to a different value (not just updating quantity)
+            if (skuNumber && skuNumber !== sku) {
+                // Check if the new SKU already exists in this order
+                const [existingCheck] = await connection.query(
+                    'SELECT * FROM OrderItems WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                    [orderId, skuNumber]
+                );
+                
+                if (existingCheck && existingCheck.length > 0) {
+                    return res.status(409).json({ 
+                        message: 'This order already contains the item you are trying to change to'
+                    });
+                }
+                
+                // Update SKU and quantity
+                await connection.query(
+                    'UPDATE OrderItems SET SKU_Number = ?, QTY = ? WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                    [skuNumber, QTY, orderId, sku]
+                );
+            } else {
+                // Just update quantity (keeping the same SKU)
+                await connection.query(
+                    'UPDATE OrderItems SET QTY = ? WHERE OrderID = ? AND SKU_Number = ? AND Deleted = "No"',
+                    [QTY, orderId, sku]
+                );
+            }
+            
+            res.json({ message: 'Order item updated successfully' });
+        } finally {
+            connection.release();
+        }
+    } catch (err) {
+        console.error('Error updating order item:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
@@ -162,407 +402,850 @@ router.get('/orderitems', authenticateUser, (req, res) => {
 /**
  * GET /api/admins - Retrieve all admin users
  */
-router.get('/admins', authenticateUser, authorizeAdmin, (req, res) => {
-    const query = `
-        SELECT AdminID, UserID, Admin_fName AS firstName, Admin_lName AS lastName 
-        FROM Admin;
-    `;
+router.get('/admins', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        const query = `
+            SELECT AdminID, UserID, Admin_fName AS firstName, Admin_lName AS lastName 
+            FROM Admin;
+        `;
 
-    pool.query(query, (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [results] = await pool.query(query);
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching admins:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
-
 
 /** 
  *  SALES REPRESENTATIVE ROUTES
  */
 
-router.get('/sales_reps', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM SalesRep', (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+router.get('/sales_reps', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM SalesRep WHERE Deleted = "No"');
         res.json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching sales reps:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
-router.get('/sales_reps/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM SalesRep WHERE SalesRepID = ?', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+router.get('/sales_reps/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM SalesRep WHERE SalesRepID = ?', [req.params.id]);
         res.json(results[0] || {});
-    });
+    } catch (err) {
+        console.error('Error fetching sales rep by ID:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**
+ * DELETE /api/sales_reps/:id - Soft delete a sales representative
+ */
+router.delete('/sales_reps/:id', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting sales rep with ID:', req.params.id);
+        const query = 'UPDATE SalesRep SET Deleted = "Yes" WHERE SalesRepID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No sales rep found with ID:', req.params.id);
+            return res.status(404).json({ message: 'Sales representative not found' });
+        }
+        
+        console.log('Successfully deleted sales rep with ID:', req.params.id);
+        res.json({ message: 'Sales representative soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /** 
  *  USER ROUTES
  */
 
-router.get('/users', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM User', (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+router.get('/user', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM User');
         res.json(results);
-    });
-});
-
-router.get('/users/:id', authenticateUser, (req, res) => {
-    pool.query('SELECT * FROM User WHERE UserID = ?', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json(results[0] || {});
-    });
-});
-
-router.post ('/users', authenticateUser, authorizeAdmin, (req, res) => {
-    const { User_fName, User_lName, Username, UserPassword, User_Type }  = req.body;
-    
-    if (!User_fName || !User_lName || !Username || !UserPassword) {
-        return res.status(400).json ({ message: 'Missing required fields'});
+    } catch (err) {
+        console.error('Error fetching users:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
     }
-
-    const user = {
-        User_fName,
-        User_lName,
-        Username,
-        UserPassword,
-        User_Type: User_Type || 'admin',
-        Deleted: 'no'
-
-
-    };
-
-    pool.query ('INSERT INTO User SET ?', user, (err, result) => {
-        if (err) return res.status(500).json({ message: 'Error with database', error:err.message});
-    });
 });
 
-module.exports = router; 
+router.get('/user/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM User WHERE UserID = ?', [req.params.id]);
+        res.json(results[0] || {});
+    } catch (err) {
+        console.error('Error fetching user by ID:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
 
+// Create user and hash password
+router.post('/user', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        const { User_fName, User_lName, Username, UserPassword, UserType } = req.body;
+
+        if (!User_fName || !User_lName || !Username || !UserPassword || !UserType) {
+            return res.status(400).json({ message: 'Missing required fields'});
+        }
+
+        // Hash the password with bcrypt before storing it
+        const hashedPassword = await bcrypt.hash(UserPassword, 10);
+
+        const user = {
+            User_fName,
+            User_lName,
+            Username,
+            UserPassword: hashedPassword, // Store the hashed password
+            UserType,
+            Deleted: 'No'
+        };
+
+        const [result] = await pool.query('INSERT INTO User SET ?', [user]);
+        res.status(201).json({ message: 'User created successfully', id: result.insertId });
+    } catch (err) {
+        console.error('Error creating user:', err);
+        res.status(500).json({ message: 'Error with database', error: err.message });
+    }
+});
+
+/**
+ * DELETE /api/users/:id - Soft delete a user
+ */
+router.delete('/users/:id', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        console.log('Deleting user with ID:', req.params.id);
+        const query = 'UPDATE User SET Deleted = "Yes" WHERE UserID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No user found with ID:', req.params.id);
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        console.log('Successfully deleted user with ID:', req.params.id);
+        res.json({ message: 'User soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
 /**
  * PUT /api/inventory/:id - Update an existing inventory item
  */
-router.put('/inventory/:id', authenticateUser, (req, res) => {
-    const inventoryId = req.params.id; // Extract inventory ID from URL
-    const { name, quantity, location, category } = req.body; // Extract update data
+router.put('/inventory/:id', authenticateUser, async (req, res) => {
+    try {
+        const inventoryId = req.params.id;
+        const { name, quantity, itemDesc } = req.body;
 
-    // Basic input validation (ensure all required fields are present)
-    if (!name || !quantity || !location || !category) {
-        return res.status(400).json({ message: 'All fields are required' });
-    }
-
-    // SQL query to update the inventory item
-    const updateQuery = `
-        UPDATE Inventory
-        SET name = ?, quantity = ?, location = ?, category = ?
-        WHERE SKU_Number = ?;
-    `;
-
-    // Execute the update query
-    pool.query(updateQuery, [name, quantity, location, category, inventoryId], (err, result) => {
-        if (err) {
-            console.error('Database update error:', err);
-            return res.status(500).json({ message: 'Database query error' });
+        // Update validation to only require fields you actually need
+        if (!name || !quantity) {
+            return res.status(400).json({ message: 'Name and quantity are required' });
         }
 
-        // Check if any rows were affected (i.e., if the item exists)
+        const updateQuery = `
+            UPDATE Inventory
+            SET ItemName = ?, Item_Quantity = ?, Item_Desc = ?
+            WHERE SKU_Number = ?;
+        `;
+
+        const [result] = await pool.query(updateQuery, [name, quantity, itemDesc || '', inventoryId]);
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Inventory item not found' });
         }
 
         return res.status(200).json({ message: 'Inventory item updated successfully' });
-    });
+    } catch (err) {
+        console.error('Database update error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  * PUT /api/customers/:id - Update an existing customer record (supports partial updates)
  */
-router.put('/customers/:id', authenticateUser, (req, res) => {
-    const customerId = req.params.id;
-    const updates = req.body; // Extract the fields the user wants to update
+router.put('/customer/:id', authenticateUser, async (req, res) => {
+    try {
+        const customerId = req.params.id;
+        const updates = req.body;
 
-    // If no fields are provided, return an error
-    if (Object.keys(updates).length === 0) {
-        return res.status(400).json({ message: 'At least one field is required for an update' });
-    }
+        // Accept either naming convention
+        const fieldsToUpdate = {};
 
-    // Build the dynamic SQL query
-    let query = 'UPDATE Customer SET ';
-    const values = [];
-
-    // Loop through the request body and construct the query dynamically
-    Object.keys(updates).forEach((key, index) => {
-        query += `${key} = ?`;
-        if (index < Object.keys(updates).length - 1) query += ', '; // Add a comma between fields
-        values.push(updates[key]);
-    });
-
-    query += ' WHERE CustomerID = ?;';
-    values.push(customerId); // Append the customer ID for the WHERE clause
-
-    // Execute the update query
-    pool.query(query, values, (err, result) => {
-        if (err) {
-            console.error('Database update error:', err);
-            return res.status(500).json({ message: 'Database query error' });
+        if (updates.firstName || updates.Customer_fName) {
+            fieldsToUpdate.Customer_fName = updates.firstName || updates.Customer_fName;
+        }
+        if (updates.lastName || updates.Customer_lName) {
+            fieldsToUpdate.Customer_lName = updates.lastName || updates.Customer_lName;
+        }
+        if (updates.address || updates.CustomerAddress) {
+            fieldsToUpdate.CustomerAddress = updates.address || updates.CustomerAddress;
+        }
+        if (updates.phone || updates.CustomerPhone) {
+            fieldsToUpdate.CustomerPhone = updates.phone || updates.CustomerPhone;
         }
 
+        if (Object.keys(fieldsToUpdate).length === 0) {
+            return res.status(400).json({ message: 'At least one field is required for an update' });
+        }
+
+        let query = 'UPDATE Customer SET ';
+        const values = [];
+
+        Object.keys(fieldsToUpdate).forEach((key, index) => {
+            query += `${key} = ?`;
+            if (index < Object.keys(fieldsToUpdate).length - 1) query += ', ';
+            values.push(fieldsToUpdate[key]);
+        });
+
+        query += ' WHERE CustomerID = ?;';
+        values.push(customerId);
+
+        const [result] = await pool.query(query, values);
+        
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Customer not found' });
         }
-
+        
         return res.status(200).json({ message: 'Customer updated successfully' });
-    });
+    } catch (err) {
+        console.error('Database update error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
-
 
 /**
  * PUT APIs PUT /api/orders/:id - Update an existing order 
  */
-router.put('/orders/:id', authenticateUser, (req, res) => {
-    const orderId = req.params.id;
-    const { customerID, techID, salesRepID } = req.body;
+router.put('/orders/:id', authenticateUser, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const { customerID, techID, salesRepID } = req.body;
 
-    if (!customerID || !techID || !salesRepID) {
-        return res.status(400).json({ message: 'All fields are required' });
-    }
+        if (!customerID || !techID || !salesRepID) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
 
-    const query = `
-        UPDATE \`Order\`
-        SET CustomerID = ?, TechID = ?, SalesRepID = ?
-        WHERE OrderID = ?;
-    `;
+        const query = `
+            UPDATE \`Order\`
+            SET CustomerID = ?, TechID = ?, SalesRepID = ?
+            WHERE OrderID = ?;
+        `;
 
-    pool.query(query, [customerID, techID, salesRepID, orderId], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [result] = await pool.query(query, [customerID, techID, salesRepID, orderId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Order not found' });
         }
 
         res.json({ message: 'Order updated successfully' });
-    });
+    } catch (err) {
+        console.error('Error updating order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
-/**
- * PUT /api/users/:id - Update a user's information
- */
-router.put('/users/:id', authenticateUser, (req, res) => {
-    const userId = req.params.id;
-    const { User_fName, User_lName, Username, UserPassword, UserType } = req.body;
+// Update user and hash password if provided
+router.put('/users/:id', authenticateUser, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const { User_fName, User_lName, Username, UserPassword, UserType, Deleted } = req.body;
 
-    if (!User_fName || !User_lName || !Username || !UserPassword || !UserType) {
-        return res.status(400).json({ message: 'All fields are required' });
-    }
+        if (!User_fName || !User_lName || !Username || !UserType) {
+            return res.status(400).json({ message: 'All fields except password are required' });
+        }
 
-    const query = `
-        UPDATE User
-        SET User_fName = ?, User_lName = ?, Username = ?, UserPassword = ?, UserType = ?
-        WHERE UserID = ?;
-    `;
+        let query;
+        const values = [];
 
-    pool.query(query, [User_fName, User_lName, Username, UserPassword, UserType, userId], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        if (UserPassword) {
+            // Hash the password if it's provided
+            const hashedPassword = await bcrypt.hash(UserPassword, 10);
+            
+            query = `
+                UPDATE User
+                SET User_fName = ?, User_lName = ?, Username = ?, UserPassword = ?, UserType = ?, Deleted = ?
+                WHERE UserID = ?;
+            `;
+            values.push(User_fName, User_lName, Username, hashedPassword, UserType, Deleted || 'No', userId);
+        } else {
+            query = `
+                UPDATE User
+                SET User_fName = ?, User_lName = ?, Username = ?, UserType = ?, Deleted = ?
+                WHERE UserID = ?;
+            `;
+            values.push(User_fName, User_lName, Username, UserType, Deleted || 'No', userId);
+        }
 
+        const [result] = await pool.query(query, values);
+        
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
-
+        
         res.json({ message: 'User updated successfully' });
-    });
+    } catch (err) {
+        console.error('Error updating user:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**
+ * PUT sales rep
+ */
+router.put('/sales_reps/:id', authenticateUser, async (req, res) => {
+    try {
+        const repId = req.params.id;
+        const { SalesRep_fName, SalesRep_lName, UserID, Deleted } = req.body;
+
+        if (!SalesRep_fName || !SalesRep_lName) {
+            return res.status(400).json({ message: 'First and last name are required' });
+        }
+
+        const query = `
+            UPDATE SalesRep
+            SET SalesRep_fName = ?, SalesRep_lName = ?, UserID = ?, Deleted = ?
+            WHERE SalesRepID = ?;
+        `;
+
+        const [result] = await pool.query(query, [SalesRep_fName, SalesRep_lName, UserID || null, Deleted || 'No', repId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Sales Rep not found' });
+        }
+        
+        res.json({ message: 'Sales Rep updated successfully' });
+    } catch (err) {
+        console.error('Error updating sales rep:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  * PUT /api/technicians/:id - Update a technician
  */
-router.put('/technicians/:id', authenticateUser, (req, res) => {
-    const techId = req.params.id;
-    const { Tech_fName, Tech_lName, UserID } = req.body;
+router.put('/technicians/:id', authenticateUser, async (req, res) => {
+    try {
+        const techId = req.params.id;
+        const { Tech_fName, Tech_lName, UserID, Deleted } = req.body;
 
-    if (!Tech_fName || !Tech_lName) {
-        return res.status(400).json({ message: 'First and last name are required' });
-    }
+        if (!Tech_fName || !Tech_lName) {
+            return res.status(400).json({ message: 'First and last name are required' });
+        }
 
-    const query = `
-        UPDATE Technician
-        SET Tech_fName = ?, Tech_lName = ?, UserID = ?
-        WHERE TechID = ?;
-    `;
+        const query = `
+            UPDATE Technician
+            SET Tech_fName = ?, Tech_lName = ?, UserID = ?, Deleted = ?
+            WHERE TechID = ?;
+        `;
 
-    pool.query(query, [Tech_fName, Tech_lName, UserID || null, techId], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-
+        const [result] = await pool.query(query, [Tech_fName, Tech_lName, UserID || null, Deleted || 'No', techId]);
+        
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Technician not found' });
         }
-
+        
         res.json({ message: 'Technician updated successfully' });
-    });
+    } catch (err) {
+        console.error('Error updating technician:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /** 
- *POST APIs (Creating New Records)
-*/
-router.post('/inventory', authenticateUser, (req, res) => {
-    const { itemName, itemDesc, itemQuantity } = req.body;
+ * POST APIs (Creating New Records)
+ */
+router.post('/inventory', authenticateUser, async (req, res) => {
+    try {
+        const { itemName, itemDesc, itemQuantity } = req.body;
 
-    if (!itemName || !itemQuantity) {
-        return res.status(400).json({ message: 'Item name and quantity are required' });
-    }
+        if (!itemName || !itemQuantity) {
+            return res.status(400).json({ message: 'Item name and quantity are required' });
+        }
 
-    const query = `
-        INSERT INTO Inventory (ItemName, Item_Desc, Item_Quantity) 
-        VALUES (?, ?, ?);
-    `;
+        const query = `
+            INSERT INTO Inventory (ItemName, Item_Desc, Item_Quantity) 
+            VALUES (?, ?, ?);
+        `;
 
-    pool.query(query, [itemName, itemDesc || '', itemQuantity], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [result] = await pool.query(query, [itemName, itemDesc || '', itemQuantity]);
         res.status(201).json({ message: 'Inventory item added successfully', id: result.insertId });
-    });
+    } catch (err) {
+        console.error('Error creating inventory item:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  * POST /api/customers - Add a new customer
  */
-router.post('/customers', authenticateUser, (req, res) => {
-    const { firstName, lastName, address, phone } = req.body;
+router.post('/customers', authenticateUser, async (req, res) => {
+    try {
+        const { firstName, lastName, address, phone } = req.body;
 
-    if (!firstName || !lastName || !address || !phone) {
-        return res.status(400).json({ message: 'All fields are required' });
-    }
+        if (!firstName || !lastName || !address || !phone) {
+            return res.status(400).json({ message: 'All fields are required' });
+        }
 
-    const query = `
-        INSERT INTO Customer (Customer_fName, Customer_lName, CustomerAddress, CustomerPhone)
-        VALUES (?, ?, ?, ?);
-    `;
+        const query = `
+            INSERT INTO Customer (Customer_fName, Customer_lName, CustomerAddress, CustomerPhone)
+            VALUES (?, ?, ?, ?);
+        `;
 
-    pool.query(query, [firstName, lastName, address, phone], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [result] = await pool.query(query, [firstName, lastName, address, phone]);
         res.status(201).json({ message: 'Customer added successfully', id: result.insertId });
-    });
+    } catch (err) {
+        console.error('Error creating customer:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  * POST /api/technicians - Add a new technician
  */
-router.post('/technicians', authenticateUser, (req, res) => {
-    const { firstName, lastName, userID } = req.body;
+router.post('/technicians', authenticateUser, async (req, res) => {
+    try {
+        const { Tech_fName, Tech_lName, UserID } = req.body;
 
-    if (!firstName || !lastName) {
-        return res.status(400).json({ message: 'First and last name are required' });
-    }
+        if (!Tech_fName || !Tech_lName) {
+            return res.status(400).json({ message: 'First and last name are required' });
+        }
 
-    const query = `
-        INSERT INTO Technician (Tech_fName, Tech_lName, UserID)
-        VALUES (?, ?, ?);
-    `;
+        const query = `
+            INSERT INTO Technician (Tech_fName, Tech_lName, UserID)
+            VALUES (?, ?, ?);
+        `;
 
-    pool.query(query, [firstName, lastName, userID || null], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [result] = await pool.query(query, [Tech_fName, Tech_lName, UserID || null]);
         res.status(201).json({ message: 'Technician added successfully', id: result.insertId });
-    });
+    } catch (err) {
+        console.error('Error creating technician:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
  * POST /api/sales_reps - Add a new sales rep
  */
-router.post('/sales_reps', authenticateUser, (req, res) => {
-    const { firstName, lastName, userID } = req.body;
+router.post('/sales_reps', authenticateUser, async (req, res) => {
+    try {
+        const { SalesRep_fName, SalesRep_lName, UserID } = req.body;
 
-    if (!firstName || !lastName) {
-        return res.status(400).json({ message: 'First and last name are required' });
-    }
+        if (!SalesRep_fName || !SalesRep_lName) {
+            return res.status(400).json({ message: 'First and last name are required' });
+        }
 
-    const query = `
-        INSERT INTO SalesRep (SalesRep_fName, SalesRep_lName, UserID)
-        VALUES (?, ?, ?);
-    `;
+        const query = `
+            INSERT INTO SalesRep (SalesRep_fName, SalesRep_lName, UserID)
+            VALUES (?, ?, ?);
+        `;
 
-    pool.query(query, [firstName, lastName, userID || null], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [result] = await pool.query(query, [SalesRep_fName, SalesRep_lName, UserID || null]);
         res.status(201).json({ message: 'Sales Rep added successfully', id: result.insertId });
-    });
+    } catch (err) {
+        console.error('Error creating sales rep:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
-
 
 /**
  * POST /api/orders - Create a new order
  */
-router.post('/orders', authenticateUser, (req, res) => {
-    const { customerID, techID, salesRepID } = req.body;
+router.post('/orders', authenticateUser, async (req, res) => {
+    try {
+        const { customerID, techID, salesRepID } = req.body;
 
-    if (!customerID || !techID || !salesRepID) {
-        return res.status(400).json({ message: 'Customer ID, Technician ID, and Sales Rep ID are required' });
-    }
+        if (!customerID || !techID || !salesRepID) {
+            return res.status(400).json({ message: 'Customer ID, Technician ID, and Sales Rep ID are required' });
+        }
 
-    const query = `
-        INSERT INTO \`Order\` (CustomerID, TechID, SalesRepID)
-        VALUES (?, ?, ?);
-    `;
+        const query = `
+            INSERT INTO \`Order\` (CustomerID, TechID, SalesRepID)
+            VALUES (?, ?, ?);
+        `;
 
-    pool.query(query, [customerID, techID, salesRepID], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
+        const [result] = await pool.query(query, [customerID, techID, salesRepID]);
         res.status(201).json({ message: 'Order created successfully', id: result.insertId });
-    });
+    } catch (err) {
+        console.error('Error creating order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
 /**
- * POST /api/orderitems - Add items to an order
+ * POST /api/orderitems - Add items to an order or update quantities if item exists
  */
-router.post('/orderitems', authenticateUser, (req, res) => {
-    const { skuNumber, orderID } = req.body;
+router.post('/orderitems', authenticateUser, async (req, res) => {
+    const { skuNumber, orderID, QTY } = req.body;
+    const quantity = QTY || 1; // Default to 1 if no quantity provided
 
     if (!skuNumber || !orderID) {
         return res.status(400).json({ message: 'SKU Number and Order ID are required' });
     }
 
-    const query = `
-        INSERT INTO OrderItems (SKU_Number, OrderID)
-        VALUES (?, ?);
-    `;
+    try {
+        // Get a connection from the pool
+        const connection = await pool.getConnection();
 
-    pool.query(query, [skuNumber, orderID], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.status(201).json({ message: 'Order item added successfully' });
-    });
+        try {
+            // Check for existing assignment (including soft-deleted ones)
+            const [rows] = await connection.query(
+                'SELECT * FROM OrderItems WHERE SKU_Number = ? AND OrderID = ?',
+                [skuNumber, orderID]
+            );
+
+            if (rows && rows.length > 0) {
+                const existing = rows[0];
+                if (existing.Deleted === 'Yes') {
+                    // Reactivate soft-deleted assignment and set new quantity
+                    await connection.query(
+                        'UPDATE OrderItems SET Deleted = "No", QTY = ? WHERE SKU_Number = ? AND OrderID = ?',
+                        [quantity, skuNumber, orderID]
+                    );
+                    return res.status(200).json({
+                        message: 'Order item reactivated successfully'
+                    });
+                } else {
+                    // Item exists and is active - update the quantity (add to existing)
+                    const newQuantity = Number(existing.QTY || 0) + Number(quantity);
+                    
+                    await connection.query(
+                        'UPDATE OrderItems SET QTY = ? WHERE SKU_Number = ? AND OrderID = ?',
+                        [newQuantity, skuNumber, orderID]
+                    );
+                    
+                    return res.status(200).json({
+                        message: 'Order item quantity updated successfully'
+                    });
+                }
+            }
+
+            // Create new assignment with quantity
+            await connection.query(
+                'INSERT INTO OrderItems (SKU_Number, OrderID, QTY) VALUES (?, ?, ?)',
+                [skuNumber, orderID, quantity]
+            );
+
+            res.status(201).json({ message: 'Order item added successfully' });
+        } finally {
+            // Always release the connection back to the pool
+            connection.release();
+        }
+    } catch (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({
+            message: 'Database query error',
+            error: err.message
+        });
+    }
 });
 
 /**
- * DELETE API (soft delete)
+ * DELETE /api/orders/:id - Soft delete an order
  */
-router.delete('/inventory/:id', authenticateUser, (req, res) => {
-    const inventoryId = req.params.id;
+router.delete('/orders/:id', authenticateUser, async (req, res) => {
+    try {
+        const [result] = await pool.query('UPDATE `Order` SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
 
-    const query = `
-        UPDATE Inventory SET Deleted = 'Yes' WHERE SKU_Number = ?;
-    `;
-
-    pool.query(query, [inventoryId], (err, result) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json({ message: 'Inventory item soft deleted' });
-    });
+        // Also soft delete all associated order items
+        await pool.query('UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id]);
+        
+        res.json({ message: 'Order and all items soft deleted' });
+    } catch (err) {
+        console.error('Error deleting order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
 });
 
+/**
+ * DELETE /api/orderitems/:orderId/:sku - Soft delete a specific item from an order
+ */
+router.delete('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
+    try {
+        const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ? AND SKU_Number = ?';
+        const [result] = await pool.query(query, [req.params.orderId, req.params.sku]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'Order item not found or already deleted'
+            });
+        }
+        
+        res.json({ message: 'Order item soft deleted' });
+    } catch (err) {
+        console.error('Error deleting order item:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
 
+/**
+ * DELETE /api/orderitems/:orderId - Soft delete all items from an order
+ */
+router.delete('/orderitems/:orderId', authenticateUser, async (req, res) => {
+    try {
+        const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?';
+        const [result] = await pool.query(query, [req.params.orderId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'No order items found or already deleted'
+            });
+        }
+        
+        res.json({
+            message: `All items from order ${req.params.orderId} soft deleted`,
+            count: result.affectedRows
+        });
+    } catch (err) {
+        console.error('Error deleting order items:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**
+ * DELETE API for Customer
+ */
+router.delete('/customers/:id', authenticateUser, async (req, res) => {
+    try {
+        const query = 'UPDATE Customer SET Deleted = "Yes" WHERE CustomerID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+        
+        res.json({ message: 'Customer soft deleted' });
+    } catch (err) {
+        console.error('Error deleting customer:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**
+ * POST /api/techinventory - Assign an item with quantity to a technician
+ */
+router.post('/techinventory', authenticateUser, async (req, res) => {
+    // 'quantity' from the request now represents the amount to ADD or the initial amount
+    const { skuNumber, techId, QTY } = req.body;
+
+    if (!skuNumber || !techId) {
+        return res.status(400).json({ message: 'SKU Number and Technician ID are required' });
+    }
+
+    // Validate the quantity being added/assigned in this request
+    const quantityToAddOrAssign = parseInt(QTY);
+    if (isNaN(quantityToAddOrAssign) || quantityToAddOrAssign < 1) {
+        return res.status(400).json({ message: 'Quantity must be a positive number' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction(); // Use transaction for safety
+
+        // 1. Check available quantity in main inventory FOR THE AMOUNT BEING ADDED/ASSIGNED
+        const [inventoryRows] = await connection.query(
+            'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
+            [skuNumber]
+        );
+        if (!inventoryRows || inventoryRows.length === 0) {
+             await connection.rollback();
+            return res.status(404).json({ message: `Inventory item SKU ${skuNumber} not found.` });
+        }
+        const availableQuantity = inventoryRows[0].Item_Quantity;
+
+        // Check if the amount we want to add/assign NOW is available
+        if (quantityToAddOrAssign > availableQuantity) {
+             await connection.rollback();
+             return res.status(400).json({ message: `Cannot process request: Amount needed (${quantityToAddOrAssign}) exceeds available inventory (${availableQuantity}) for SKU ${skuNumber}.` });
+        }
+
+        // 2. Check for existing TechInventory assignment (active or deleted)
+        const [existingRows] = await connection.query(
+            'SELECT * FROM TechInventory WHERE SKU_Number = ? AND TechID = ?',
+            [skuNumber, techId]
+        );
+
+        if (existingRows && existingRows.length > 0) {
+            const existing = existingRows[0];
+            if (existing.Deleted === 'Yes') {
+                 // Reactivating: Behavior remains the same - set quantity to the requested amount.
+                 // Inventory check already passed above for 'quantityToAddOrAssign'.
+                await connection.query(
+                    'UPDATE TechInventory SET QTY = ?, Deleted = "No" WHERE SKU_Number = ? AND TechID = ?',
+                    [quantityToAddOrAssign, skuNumber, techId]
+                );
+                 // Decrease main inventory quantity by the amount being assigned now
+                 await connection.query(
+                     'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                     [quantityToAddOrAssign, skuNumber]
+                 );
+                await connection.commit();
+                return res.status(200).json({
+                    message: `Assignment for SKU ${skuNumber} reactivated for Tech ${techId} with quantity ${quantityToAddOrAssign}`
+                });
+            } else {
+                // --- MODIFIED LOGIC FOR ACTIVE ASSIGNMENT ---
+                // Already Active: ADD the requested quantity ('quantityToAddOrAssign') to the existing quantity.
+                 const currentQty = existing.QTY;
+
+                 // Calculate the new total quantity
+                 const newTotalQty = currentQty + quantityToAddOrAssign;
+
+                // Update TechInventory quantity to the NEW TOTAL
+                await connection.query(
+                    'UPDATE TechInventory SET QTY = ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+                    [newTotalQty, skuNumber, techId]
+                );
+
+                 // Adjust main inventory - decrease ONLY by the amount ADDED in this request
+                 await connection.query(
+                     'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                     [quantityToAddOrAssign, skuNumber] // Decrease only by the quantity added now
+                 );
+
+                await connection.commit();
+                return res.status(200).json({
+                    // Updated message reflecting the addition
+                    message: `${quantityToAddOrAssign} units of SKU ${skuNumber} added for Tech ${techId}. New total: ${newTotalQty}`
+                });
+                // --- END OF MODIFIED LOGIC ---
+            }
+        } else {
+            // New Assignment: Behavior remains the same - assign 'quantityToAddOrAssign'.
+            // Inventory check already passed above.
+            await connection.query(
+                'INSERT INTO TechInventory (SKU_Number, TechID, QTY, Deleted) VALUES (?, ?, ?, "No")',
+                [skuNumber, techId, quantityToAddOrAssign]
+            );
+             // Decrease main inventory quantity
+             await connection.query(
+                 'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                 [quantityToAddOrAssign, skuNumber]
+             );
+            await connection.commit();
+            res.status(201).json({
+                message: `SKU ${skuNumber} assigned to Tech ${techId} with quantity ${quantityToAddOrAssign}`
+            });
+        }
+    } catch (err) {
+        if (connection) await connection.rollback();
+         if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+              return res.status(400).json({ message: 'Invalid SKU Number or Technician ID provided.' });
+         }
+         if (err.code === 'ER_DATA_TOO_LONG') {
+              return res.status(400).json({ message: 'Input data too long for database field.' });
+         }
+         if (err.code === 'ER_CHECK_CONSTRAINT_VIOLATED' || err.message.includes('Item_Quantity_NonNegative')) {
+             return res.status(400).json({ message: `Operation failed: Inventory quantity cannot go below zero for SKU ${skuNumber}.`});
+         }
+        console.error('Database error during tech inventory assignment:', err);
+        return res.status(500).json({
+            message: 'Database query error during assignment',
+            error: err.message
+        });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
+// DELETE /api/inventory/:sku - Soft delete an inventory item
+
+router.delete('/inventory/:sku', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting inventory item with SKU:', req.params.sku);
+        const query = 'UPDATE Inventory SET Deleted = "Yes" WHERE SKU_Number = ?';
+        const [result] = await pool.query(query, [req.params.sku]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No inventory item found with SKU:', req.params.sku);
+            return res.status(404).json({ message: 'Inventory item not found' });
+        }
+ 
+        console.log('Successfully deleted inventory item with SKU:', req.params.sku);
+        res.json({ message: 'Inventory item soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+ })
 
 
 /**
- * GET /api/order/:id/details - retrieving full order details
+ * DELETE /api/techinventory/:sku/:techId - Soft delete a technician's inventory assignment (return item to main inventory)
  */
-router.get('/orders/:id/details', authenticateUser, (req, res) => {
-    const query = `
-        SELECT o.OrderID, c.Customer_fName AS CustomerName, t.Tech_fName AS TechnicianName,
-               sr.SalesRep_fName AS SalesRepName, i.ItemName
-        FROM \`Order\` o
-        JOIN Customer c ON o.CustomerID = c.CustomerID
-        JOIN Technician t ON o.TechID = t.TechID
-        JOIN SalesRep sr ON o.SalesRepID = sr.SalesRepID
-        JOIN OrderItems oi ON o.OrderID = oi.OrderID
-        JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
-        WHERE o.OrderID = ?;
-    `;
+router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) => {
+    const { sku, techId } = req.params;
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction(); // Use transaction
 
-    pool.query(query, [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ message: 'Database query error' });
-        res.json(results);
-    });
+        // 1. Find the quantity being removed from the technician (lock the row)
+        const [techInvRows] = await connection.query(
+            'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
+            [sku, techId]
+        );
+
+        if (!techInvRows || techInvRows.length === 0) {
+             await connection.rollback(); // Rollback transaction
+            return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
+        }
+        
+        // FIX: Use correct property name - QTY instead of Quantity
+        const quantityToRemove = techInvRows[0].QTY;
+
+        // 2. Soft delete the TechInventory record (set Deleted='Yes', Quantity=0)
+        const [result] = await connection.query(
+            'UPDATE TechInventory SET Deleted = "Yes", QTY = 0 WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+            [sku, techId]
+        );
+
+        // Verify deletion occurred (should always pass if SELECT found the row)
+        if (result.affectedRows === 0) {
+             await connection.rollback();
+             console.warn(`TechInventory delete failed unexpectedly after select for SKU ${sku}, Tech ${techId}`);
+             return res.status(500).json({ message: 'Failed to delete assignment record unexpectedly.' });
+        }
+
+         // 3. Add the quantity back to the main Inventory (ensure item exists and is not deleted)
+         const [invUpdateResult] = await connection.query(
+             'UPDATE Inventory SET Item_Quantity = Item_Quantity + ? WHERE SKU_Number = ? AND Deleted = "No"',
+             [quantityToRemove, sku]
+         );
+
+         // Check if the inventory item was found to add back to
+         if (invUpdateResult.affectedRows === 0) {
+             await connection.rollback();
+             console.error(`Failed to return quantity to inventory: Inventory item SKU ${sku} not found or deleted.`);
+             // Decide how critical this is - maybe still allow tech inventory removal but warn?
+             // For stricter consistency, fail the whole operation.
+             return res.status(404).json({ message: `Assignment removed, but failed to return quantity: Inventory item SKU ${sku} not found or is deleted.`});
+         }
+
+        await connection.commit(); // Commit transaction
+        console.log(`Successfully removed assignment for SKU ${sku} from Tech ${techId}, returned ${quantityToRemove} to inventory.`);
+        res.json({ message: 'Technician inventory assignment removed successfully, quantity returned to main inventory.' });
+
+    } catch (err) {
+        if (connection) await connection.rollback(); // Rollback on any error
+        console.error('Error removing tech inventory assignment:', err);
+        res.status(500).json({ message: 'Database query error during removal', error: err.message });
+    } finally {
+        if (connection) connection.release(); // Always release connection
+    }
 });
 
 module.exports = router;
