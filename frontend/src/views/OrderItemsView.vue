@@ -20,18 +20,19 @@
         {{ error.orders }}
       </div>
       <div v-else>
-        <table>
-          <thead>
+      <table>
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Customer Name</th>
+            <th>Sales Rep</th>
+            <th>Technician</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="order in orders" :key="order.OrderID">
             <tr>
-              <th>Order ID</th>
-              <th>Customer Name</th>
-              <th>Sales Rep</th>
-              <th>Technician</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="order in orders" :key="order.OrderID">
               <td>{{ order.OrderID }}</td>
               <td>{{ getCustomerName(order.CustomerID) }}</td>
               <td>{{ getSalesRepName(order.SalesRepID) }}</td>
@@ -45,39 +46,46 @@
                 <button @click="deleteOrder(order.OrderID)" class="btn-delete">Delete</button>
               </td>
             </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!--View Order-->
-      <div v-if="expandedOrder" class="expanded-details">
-        <h3>Order Items</h3>
-        <div v-if="loading.orderItems" class="loading">Loading order items...</div>
-        <div v-else-if="error.orderItems" class="error-message">
-          {{ error.orderItems }}
-        </div>
-        <table v-else>
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>SKU Number</th>
-              <th>Quantity</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in orderItems" :key="item.SKU_Number">
-              <td>{{ item.ItemName }}</td>
-              <td>{{ item.SKU_Number }}</td>
-              <td>{{ item.QTY }}</td>
-              <td>
-                <button @click="editOrderItem(item)" class="btn-edit">Edit</button>
-                <button @click="deleteOrderItem(item)" class="btn-delete">Delete</button>
+            <!-- Order details row -->
+            <tr v-if="expandedOrder === order.OrderID" class="order-details-row">
+              <td colspan="5">
+                <div class="order-details-container">
+                  <h3>Order Items</h3>
+                  <div v-if="loading.orderItems" class="loading">Loading order items...</div>
+                  <div v-else-if="error.orderItems" class="error-message">
+                    {{ error.orderItems }}
+                  </div>
+                  <table v-else class="order-items-table">
+                    <thead>
+                      <tr>
+                        <th>Item Name</th>
+                        <th>SKU Number</th>
+                        <th>Quantity</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="item in orderItems" :key="item.SKU_Number">
+                        <td>{{ item.ItemName }}</td>
+                        <td>{{ item.SKU_Number }}</td>
+                        <td>{{ item.QTY }}</td>
+                        <td>
+                          <button @click="editOrderItem(item)" class="btn-edit">Edit</button>
+                          <button @click="deleteOrderItem(item)" class="btn-delete">Delete</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </td>
             </tr>
-          </tbody>
-        </table>
-      </div>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+
+
     </div>
 
       <!--Edit Order-->
@@ -294,7 +302,7 @@ export default {
       expandedOrder: null,       // OrderID of the currently expanded order, or null
       selectedOrder: null,       // The order object currently selected for actions (e.g., adding items)
       editingOrder: null,        // The order object being edited, or null if creating
-      
+
       // Form data for creating/editing an order
       orderForm: {
         CustomerID: '',
@@ -354,7 +362,7 @@ export default {
     editOrder(order) {
       // Store the order being edited
       this.editingOrder = order;
-      
+
       // Populate the form with the order's current data
       this.orderForm = {
         CustomerID: order.CustomerID,
@@ -362,7 +370,7 @@ export default {
         TechID: order.TechID,
         Items: [] // Items are handled separately
       };
-      
+
       // Display the edit form modal
       this.showOrderCreateForm = true;
     },
@@ -374,7 +382,7 @@ export default {
       // Consider current quantity + available stock? Or just available stock? Assuming available stock for now.
       // If editing, it should probably be current quantity + remaining stock. Needs clarification based on backend logic.
       // For simplicity, returning available quantity from inventory.
-      return item ? item.Item_Quantity : 1; 
+      return item ? item.Item_Quantity : 1;
     },
 
     // Orchestrates loading of all necessary data for the component.
@@ -406,13 +414,13 @@ export default {
  // Fetches the detailed items for a specific order from the API.
 async loadOrderItems(orderID) {
   if (!orderID) return; // Don't proceed if no order ID is provided
-  
+
   this.loading.orderItems = true;
   this.error.orderItems = null;
   try {
     // Use the dedicated endpoint for order items
     const orderItems = await api.fetchData(`/orders/${orderID}/items`);
-    
+
     // Since we're now using the correct endpoint, we expect an array response
     if (Array.isArray(orderItems)) {
       this.orderItems = orderItems;
@@ -478,7 +486,7 @@ async loadOrderItems(orderID) {
       this.error.inventory = null;
       try {
         const response = await api.getInventory();
-        console.log('Inventory response:', response); 
+        console.log('Inventory response:', response);
         if (Array.isArray(response)) {
           this.inventory = response;
         } else {
@@ -500,7 +508,7 @@ async loadOrderItems(orderID) {
       if (confirm(`Are you sure you want to remove ${item.ItemName} (SKU: ${item.SKU_Number}) from this order?`)) {
         try {
           // Assuming api.deleteOrderItem takes orderID and skuNumber
-          await api.deleteOrderItem(this.expandedOrder, item.SKU_Number); 
+          await api.deleteOrderItem(this.expandedOrder, item.SKU_Number);
           // Refresh the order items list for the currently expanded order
           await this.loadOrderItems(this.expandedOrder);
         } catch (error) {
@@ -527,7 +535,7 @@ async loadOrderItems(orderID) {
       const technician = this.technicians.find(t => t.TechID === techID);
       return technician ? `${technician.firstName} ${technician.lastName}` : 'Unknown';
     },
-    
+
     // Helper method: Finds and returns the item's name based on SKU number.
     getItemName(skuNumber) {
       const item = this.inventory.find(item => item.SKU_Number === skuNumber);
@@ -555,10 +563,10 @@ async loadOrderItems(orderID) {
             await this.loadInventory();
           }
           // Reset the item selection form and list
-          this.selectedItems = []; 
+          this.selectedItems = [];
           this.itemToAdd = { SKU_Number: '', QTY: 1 };
           this.showAddItemsModal = true; // Open the modal
-          console.log('Available items for adding:', this.availableItems); 
+          console.log('Available items for adding:', this.availableItems);
         } catch (error) {
           console.error('Error preparing to add items:', error);
           this.error.inventory = 'Failed to load inventory items';
@@ -593,11 +601,11 @@ async saveEditedItem() {
     // Add more debugging to see exactly what's happening
     console.log('Edit Item Form Data:', {
       OrderID: this.editItemForm.OrderID,
-      SKU_Number: this.editItemForm.SKU_Number, 
+      SKU_Number: this.editItemForm.SKU_Number,
       originalSKU: this.editItemForm.originalSKU,
       QTY: this.editItemForm.QTY
     });
-    
+
     // Make sure QTY is defined and valid
     if (!this.editItemForm.QTY || isNaN(Number(this.editItemForm.QTY)) || this.editItemForm.QTY < 1) {
       alert('Please enter a valid quantity (minimum 1)');
@@ -608,17 +616,17 @@ async saveEditedItem() {
     const requestBody = {
       QTY: Number(this.editItemForm.QTY)
     };
-    
+
     // Only include skuNumber if it's actually changing
     if (this.editItemForm.SKU_Number !== this.editItemForm.originalSKU) {
       requestBody.skuNumber = this.editItemForm.SKU_Number;
     }
-    
+
     console.log('Sending update request:', {
       url: `/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`,
       body: requestBody
     });
-    
+
     // Call the PUT endpoint
     await api.fetchData(`/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`, {
       method: 'PUT',
@@ -627,7 +635,7 @@ async saveEditedItem() {
     });
 
     // Refresh the order items
-    await this.loadOrderItems(this.expandedOrder); 
+    await this.loadOrderItems(this.expandedOrder);
     await this.loadInventory();
 
     this.cancelEditItem();
@@ -644,7 +652,7 @@ async saveEditedItem() {
       this.selectedItems = [];
       this.itemToAdd = { SKU_Number: '', QTY: 1 };
     },
-    
+
     // Helper method: Calculates max quantity for the item selected in the 'Add Items' modal.
     getMaxQuantity() {
       if (!this.itemToAdd.SKU_Number) return 1; // No item selected
@@ -707,7 +715,7 @@ async saveEditedItem() {
         if (this.expandedOrder === this.selectedOrder.OrderID) {
           await this.loadOrderItems(this.selectedOrder.OrderID);
         }
-        
+
         await this.loadInventory(); // Refresh inventory data
 
         this.cancelAddItems(); // Close modal and clear state
@@ -783,11 +791,11 @@ async saveEditedItem() {
         CustomerID: '',
         SalesRepID: '',
         TechID: '',
-        Items: [] 
+        Items: []
       };
     }
 
- 
+
   }
 };
 </script>
