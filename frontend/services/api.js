@@ -234,6 +234,14 @@ export default {
     });
   },
 
+  // Mark an order item as used
+async markItemAsUsed(orderId, sku) {
+  return this.fetchData(`/orderitems/${orderId}/${sku}/used`, {
+    method: 'PUT',
+    body: JSON.stringify({})
+  });
+},
+
   // --------- ORDERS ---------
   async getOrders() {
     return this.fetchData('/orders');
@@ -262,6 +270,14 @@ export default {
       method: 'DELETE'
     });
   },
+
+  // Complete an order - sets the DateCompleted field
+async completeOrder(id) {
+  return this.fetchData(`/orders/${id}/complete`, {
+    method: 'PUT',
+    body: JSON.stringify({})
+  });
+},
   
   // --------- CUSTOMERS ---------
   async getCustomers() {
