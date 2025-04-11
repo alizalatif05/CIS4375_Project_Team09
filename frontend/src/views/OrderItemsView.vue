@@ -6,11 +6,37 @@
       <span :class="connectionStatusClass">{{ connectionStatusMessage }}</span>
     </div>
 
+<!--Order Filters-->
     <div class="actions">
       <button @click="showOrderCreateForm = true" class="create-btn">
         Add New Order
       </button>
     </div>
+    <div class="date-filters">
+  <h3>Filter Orders by Date</h3>
+  <div class="filter-controls">
+    <div class="form-group">
+      <label>Filter by:</label>
+      <select v-model="dateFilters.filterBy">
+        <option value="created">Date Created</option>
+        <option value="assigned">Date Assigned</option>
+        <option value="completed">Date Completed</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Start Date:</label>
+      <input type="date" v-model="dateFilters.startDate">
+    </div>
+    
+    <div class="form-group">
+      <label>End Date:</label>
+      <input type="date" v-model="dateFilters.endDate">
+    </div>
+    
+    <button @click="resetDateFilters" class="btn-reset">Reset Filters</button>
+  </div>
+</div>
 
     <!--Initial Table-->
     <div class="data-table">
@@ -27,21 +53,28 @@
               <th>Customer Name</th>
               <th>Sales Rep</th>
               <th>Technician</th>
+              <th>Date Created</th>
+              <th>Date Assigned</th>
+              <th>Date Completed</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="order in orders" :key="order.OrderID">
+            <tr v-for="order in filteredOrders" :key="order.OrderID">
               <td>{{ order.OrderID }}</td>
               <td>{{ getCustomerName(order.CustomerID) }}</td>
               <td>{{ getSalesRepName(order.SalesRepID) }}</td>
               <td>{{ getTechnicianName(order.TechID) }}</td>
+              <td>{{ formatDate(order.DateCreated) }}</td>
+              <td>{{ formatDate(order.DateAssigned) }}</td>
+              <td>{{ formatDate(order.DateCompleted) }}</td>
               <td>
-                <button @click="toggleOrderDetails(order)" class="btn-view">
-                  {{ expandedOrder === order.OrderID ? 'Hide' : 'View' }}
+                <button @click="viewOrderDetails(order)" class="btn-view">
+                 View
                 </button>
                 <button @click="editOrder(order)" class="btn-edit">Edit</button>
                 <button @click="showAddItems(order)" class="btn-add">Add Items</button>
+                <button v-if="!order.DateCompleted" @click="completeOrder(order.OrderID)" class="btn-complete">Complete</button>
                 <button @click="deleteOrder(order.OrderID)" class="btn-delete">Delete</button>
               </td>
             </tr>
@@ -49,36 +82,79 @@
         </table>
       </div>
 
-      <!--View Order-->
-      <div v-if="expandedOrder" class="expanded-details">
-        <h3>Order Items</h3>
-        <div v-if="loading.orderItems" class="loading">Loading order items...</div>
-        <div v-else-if="error.orderItems" class="error-message">
-          {{ error.orderItems }}
+      <!-- Add this new modal for order details -->
+      <div v-if="showOrderDetailsModal" class="modal">
+        <div class="modal-content order-details-modal">
+          <div class="modal-header">
+            <h3>Order #{{ selectedOrder.OrderID }} Details</h3>
+            <button @click="closeOrderDetails" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="order-summary">
+              <div class="summary-row">
+                <div class="summary-item">
+                  <strong>Customer:</strong> {{ getCustomerName(selectedOrder.CustomerID) }}
+                </div>
+                <div class="summary-item">
+                  <strong>Sales Rep:</strong> {{ getSalesRepName(selectedOrder.SalesRepID) }}
+                </div>
+                <div class="summary-item">
+                  <strong>Technician:</strong> {{ getTechnicianName(selectedOrder.TechID) }}
+                </div>
+              </div>
+              <div class="summary-row">
+                <div class="summary-item">
+                  <strong>Created:</strong> {{ formatDate(selectedOrder.DateCreated) }}
+                </div>
+                <div class="summary-item">
+                  <strong>Assigned:</strong> {{ formatDate(selectedOrder.DateAssigned) }}
+                </div>
+                <div class="summary-item">
+                  <strong>Completed:</strong> {{ formatDate(selectedOrder.DateCompleted) }}
+                </div>
+              </div>
+            </div>
+            
+            <h3>Order Items</h3>
+            <div v-if="loading.orderItems" class="loading">Loading order items...</div>
+            <div v-else-if="error.orderItems" class="error-message">
+              {{ error.orderItems }}
+            </div>
+            <table v-else>
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>SKU Number</th>
+                  <th>Quantity</th>
+                  <th>Date Added</th>
+                  <th>Date Used</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in orderItems" :key="item.SKU_Number">
+                  <td>{{ item.ItemName }}</td>
+                  <td>{{ item.SKU_Number }}</td>
+                  <td>{{ item.QTY }}</td>
+                  <td>{{ formatDate(item.DateAdded) }}</td>
+                  <td>{{ formatDate(item.DateUsed) }}</td>
+                  <td>
+                    <button @click="editOrderItem(item)" class="btn-edit">Edit</button>
+                    <button v-if="!item.DateUsed" @click="markItemAsUsed(item)" class="btn-used">Mark Used</button>
+                    <button @click="deleteOrderItem(item)" class="btn-delete">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <div class="modal-actions">
+              <button @click="showAddItems(selectedOrder)" class="btn-add">Add Items</button>
+              <button v-if="!selectedOrder.DateCompleted" @click="completeOrder(selectedOrder.OrderID)" class="btn-complete">Complete Order</button>
+              <button @click="closeOrderDetails" class="btn-cancel">Close</button>
+            </div>
+          </div>
         </div>
-        <table v-else>
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>SKU Number</th>
-              <th>Quantity</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in orderItems" :key="item.SKU_Number">
-              <td>{{ item.ItemName }}</td>
-              <td>{{ item.SKU_Number }}</td>
-              <td>{{ item.QTY }}</td>
-              <td>
-                <button @click="editOrderItem(item)" class="btn-edit">Edit</button>
-                <button @click="deleteOrderItem(item)" class="btn-delete">Delete</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
-    </div>
 
       <!--Edit Order-->
     <div v-if="showOrderCreateForm || editingOrder" class="modal">
@@ -233,7 +309,9 @@
         </div>
       </div>
     </div>
-  </div> </template>
+  </div> 
+  </div>
+  </template>
 
 <script>
 import "@/assets/css/style.css";
@@ -283,7 +361,9 @@ export default {
       // State for the 'Add Items' modal form
       itemToAdd: {
         SKU_Number: '',
-        QTY: 1
+        QTY: 1,
+        DateAdded: null, // Added timestamp field
+        DateUsed: null   // Added timestamp field
       },
       selectedItems: [], // List of items staged to be added to an order
 
@@ -296,14 +376,27 @@ export default {
       editingOrder: null,        // The order object being edited, or null if creating
       
       // Form data for creating/editing an order
-      orderForm: {
+       orderForm: {
         CustomerID: '',
         SalesRepID: '',
         TechID: '',
-        Items: [] // Note: Items are now added separately via the 'Add Items' modal
+        DateCreated: null,  // Added timestamp field
+        DateAssigned: null, // Added timestamp field
+        DateCompleted: null, // Added timestamp field
+        Items: []
+      },
+
+      showOrderDetailsModal: false,
+
+       // Date filtering options
+       dateFilters: {
+        startDate: null,
+        endDate: null,
+        filterBy: 'created', // Options: 'created', 'assigned', 'completed'
       }
     };
   },
+
   computed: {
     // Determines the CSS class for the connection status indicator
     connectionStatusClass() {
@@ -324,13 +417,66 @@ export default {
     // Provides the list of available inventory items (assumes backend provides filtered list if needed)
     availableItems() {
       return this.inventory;
-    }
+    },
+
+    filteredOrders() {
+      if (!this.dateFilters.startDate && !this.dateFilters.endDate) {
+        return this.orders; // Return all orders if no date filters applied
+      }
+      
+      // Convert string dates to Date objects for comparison
+      const startDate = this.dateFilters.startDate ? new Date(this.dateFilters.startDate) : null;
+      const endDate = this.dateFilters.endDate ? new Date(this.dateFilters.endDate) : null;
+      
+      return this.orders.filter(order => {
+        // Determine which date field to filter on
+        let orderDate;
+        
+        switch(this.dateFilters.filterBy) {
+          case 'created':
+            orderDate = new Date(order.DateCreated);
+            break;
+          case 'assigned':
+            if (!order.DateAssigned) return false; // Skip orders without assignment date
+            orderDate = new Date(order.DateAssigned);
+            break;
+          case 'completed':
+            if (!order.DateCompleted) return false; // Skip incomplete orders
+            orderDate = new Date(order.DateCompleted);
+            break;
+          default:
+            orderDate = new Date(order.DateCreated);
+        }
+        
+        // Apply date range filtering
+        let matchesStart = true;
+        let matchesEnd = true;
+        
+        if (startDate) {
+          // Set hours to 0 for start date comparison (beginning of day)
+          const adjustedStartDate = new Date(startDate);
+          adjustedStartDate.setHours(0, 0, 0, 0);
+          matchesStart = orderDate >= adjustedStartDate;
+        }
+        
+        if (endDate) {
+          // Set hours to 23:59:59 for end date comparison (end of day)
+          const adjustedEndDate = new Date(endDate);
+          adjustedEndDate.setHours(23, 59, 59, 999);
+          matchesEnd = orderDate <= adjustedEndDate;
+        }
+        
+        return matchesStart && matchesEnd;
+      });
+    },
   },
+
   created() {
     // Initial actions when the component is created
     this.checkApiConnection();
     this.loadData();
   },
+
   methods: {
     // Checks the connection status with the backend API and provides user feedback.
     async checkApiConnection() {
@@ -404,31 +550,31 @@ export default {
     // Fetches the detailed items (including quantity) for a specific order from the API. ERROR HERE
 
  // Fetches the detailed items for a specific order from the API.
-async loadOrderItems(orderID) {
-  if (!orderID) return; // Don't proceed if no order ID is provided
-  
-  this.loading.orderItems = true;
-  this.error.orderItems = null;
-  try {
-    // Use the dedicated endpoint for order items
-    const orderItems = await api.fetchData(`/orders/${orderID}/items`);
-    
-    // Since we're now using the correct endpoint, we expect an array response
-    if (Array.isArray(orderItems)) {
-      this.orderItems = orderItems;
-    } else {
-      console.error('Expected array of order items but got:', orderItems);
-      this.error.orderItems = 'Unexpected data format received from server';
-      this.orderItems = [];
-    }
-  } catch (error) {
-    console.error('Error loading order items:', error);
-    this.error.orderItems = `Failed to load order items: ${error.message}`;
-    this.orderItems = []; // Clear items on error
-  } finally {
-    this.loading.orderItems = false;
-  }
-},
+    async loadOrderItems(orderID) {
+      if (!orderID) return; // Don't proceed if no order ID is provided
+      
+      this.loading.orderItems = true;
+      this.error.orderItems = null;
+      try {
+        // Use the dedicated endpoint for order items
+        const orderItems = await api.fetchData(`/orders/${orderID}/items`);
+        
+        // Since we're now using the correct endpoint, we expect an array response
+        if (Array.isArray(orderItems)) {
+          this.orderItems = orderItems;
+        } else {
+          console.error('Expected array of order items but got:', orderItems);
+          this.error.orderItems = 'Unexpected data format received from server';
+          this.orderItems = [];
+        }
+      } catch (error) {
+        console.error('Error loading order items:', error);
+        this.error.orderItems = `Failed to load order items: ${error.message}`;
+        this.orderItems = []; // Clear items on error
+      } finally {
+        this.loading.orderItems = false;
+      }
+    },
 
     // Fetches the list of customers from the API.
     async loadCustomers() {
@@ -536,16 +682,9 @@ async loadOrderItems(orderID) {
 
     // Toggles the visibility of an order's details section and loads/clears its items.
     toggleOrderDetails(order) {
-      if (this.expandedOrder === order.OrderID) {
-        // Collapse the currently expanded order
-        this.expandedOrder = null;
-        this.orderItems = []; // Clear items
-      } else {
-        // Expand the selected order
-        this.expandedOrder = order.OrderID;
-        this.loadOrderItems(order.OrderID); // Load items for the expanded order
-      }
+    this.viewOrderDetails(order);
     },
+
       // Opens the modal for adding multiple items to the selected order.
       async showAddItems(order) {
         this.selectedOrder = order; // Set the target order
@@ -683,49 +822,129 @@ async saveEditedItem() {
 
     // Submits the list of selected items (with quantities) from the modal to the backend API.
     async addItemsToOrder() {
-      if (this.selectedItems.length === 0) {
-        alert('Please add at least one item to the list.');
-        return;
-      }
+  if (this.selectedItems.length === 0) {
+    alert('Please add at least one item to the list.');
+    return;
+  }
 
+  try {
+    // Format the date for MySQL
+    const now = new Date();
+    const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
+    
+    // Reset the modal first - this should happen immediately
+    const orderID = this.selectedOrder.OrderID;
+    const isExpanded = this.expandedOrder === orderID;
+    
+    // Close the modal immediately
+    this.showAddItemsModal = false;
+    
+    // Iterate through the list of items to add
+    for (const item of this.selectedItems) {
+      await api.fetchData('/orderitems', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skuNumber: item.SKU_Number,
+          orderID: orderID,
+          QTY: item.QTY,
+          dateAdded: formattedDate,
+          dateUsed: null
+        })
+      });
+    }
+
+    // Update the order's lastModified date
+    await api.fetchData(`/orders/${orderID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lastModified: formattedDate
+      })
+    });
+
+    // Refresh data
+    await Promise.all([
+      this.loadInventory(),
+      this.loadOrders()
+    ]);
+    
+    // Refresh order items if needed
+    if (isExpanded) {
+      await this.loadOrderItems(orderID);
+    }
+    
+    // Reset state variables
+    this.selectedOrder = null;
+    this.selectedItems = [];
+    this.itemToAdd = { SKU_Number: '', QTY: 1 };
+    
+  } catch (error) {
+    console.error('Error adding items to order:', error);
+    alert(`Error adding items to order: ${error.message}`);
+    
+    // Make sure to close the modal even on error
+    this.showAddItemsModal = false;
+    this.selectedOrder = null;
+    this.selectedItems = [];
+    this.itemToAdd = { SKU_Number: '', QTY: 1 };
+  }
+},
+
+      // View Order Details in Modal
+      viewOrderDetails(order) {
+      this.selectedOrder = order;
+      this.expandedOrder = order.OrderID;
+      this.loadOrderItems(order.OrderID);
+      this.showOrderDetailsModal = true;
+    },
+
+    //Close Order Details modal
+      closeOrderDetails() {
+      this.showOrderDetailsModal = false;
+      this.expandedOrder = null;
+      this.orderItems = [];
+    },
+
+    
+
+     // Add a method to mark items as used (by technician)
+     async markItemAsUsed(item) {
       try {
-        // Iterate through the list of items to add
-        for (const item of this.selectedItems) {
-          // Call API to add each item with its quantity
-          await api.fetchData('/orderitems', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              skuNumber: item.SKU_Number,
-              orderID: this.selectedOrder.OrderID,
-              QTY: item.QTY
-            })
-          });
-        }
-
-        // Refresh the order items display if the affected order is currently expanded
-        if (this.expandedOrder === this.selectedOrder.OrderID) {
-          await this.loadOrderItems(this.selectedOrder.OrderID);
-        }
+        await api.markItemAsUsed(this.expandedOrder, item.SKU_Number);
         
-        await this.loadInventory(); // Refresh inventory data
-
-        this.cancelAddItems(); // Close modal and clear state
-
+        // Refresh order items
+        await this.loadOrderItems(this.expandedOrder);
+        
       } catch (error) {
-        console.error('Error adding items to order:', error);
-        alert(`Error adding items to order: ${error.message}`);
-        // Consider error handling - should it stop adding subsequent items?
+        console.error('Error marking item as used:', error);
+        alert(`Error updating item status: ${error.message}`);
       }
     },
 
     // Saves a new order or updates an existing order's core details (Customer, Rep, Tech) via API.
     async saveOrder() {
       try {
+        // Set creation date for new orders
+        if (!this.editingOrder) {
+          this.orderForm.DateCreated = new Date().toISOString();
+        }
+        
+        // If a technician is assigned and there wasn't one before, update assignment date
+        if (this.orderForm.TechID && 
+            (!this.editingOrder || !this.editingOrder.TechID || 
+             this.editingOrder.TechID !== this.orderForm.TechID)) {
+          this.orderForm.DateAssigned = new Date().toISOString();
+        }
+        
         const orderData = {
           customerID: this.orderForm.CustomerID,
           techID: this.orderForm.TechID,
-          salesRepID: this.orderForm.SalesRepID
+          salesRepID: this.orderForm.SalesRepID,
+          dateCreated: this.orderForm.DateCreated,
+          dateAssigned: this.orderForm.DateAssigned,
+          dateCompleted: this.orderForm.DateCompleted,
+          lastModified: new Date().toISOString() // Always update lastModified
         };
 
         if (this.editingOrder) {
@@ -742,8 +961,6 @@ async saveEditedItem() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(orderData)
           });
-          // Note: If a new order needs items immediately, the workflow might need adjustment.
-          // Currently, items are added *after* order creation via the 'Add Items' button.
         }
 
         await this.loadOrders(); // Refresh the main orders list
@@ -753,6 +970,34 @@ async saveEditedItem() {
         alert(`Error saving order: ${error.message}`);
       }
     },
+
+        // Add a method to complete an order
+        async completeOrder(orderID) {
+          if (confirm('Are you sure you want to complete this order? Unused items will be returned to inventory.')) {
+            try {
+              const result = await api.completeOrder(orderID);
+              
+              // Provide feedback to the user
+              if (result.itemsReturned > 0) {
+                alert(`Order completed. ${result.itemsReturned} unused items were returned to inventory.`);
+              } else {
+                alert('Order completed successfully.');
+              }
+              
+              // Refresh orders and inventory
+              await this.loadOrders();
+              await this.loadInventory();
+              
+              // Close the order details modal if it's open
+              if (this.showOrderDetailsModal && this.selectedOrder && this.selectedOrder.OrderID === orderID) {
+                this.closeOrderDetails();
+              }
+            } catch (error) {
+              console.error('Error completing order:', error);
+              alert(`Error completing order: ${error.message}`);
+            }
+          }
+        },
 
     // Deletes an entire order via API call after confirmation.
     async deleteOrder(orderID) {
@@ -785,11 +1030,26 @@ async saveEditedItem() {
         TechID: '',
         Items: [] 
       };
+    },
+
+// Format date for display
+    formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
     }
 
  
   }
-};
+}
+
 </script>
 
 <style scoped>
@@ -900,7 +1160,7 @@ select {
 }
 
 /* Basic Modal Styling (assuming styles like .modal, .modal-content etc. exist globally or in style.css) */
-/* Add styles for .loading, .error-message, .status-connected, .status-error if not defined globally */
+
 .loading {
   padding: 1rem;
   text-align: center;
@@ -930,4 +1190,116 @@ select {
   border: 1px solid red;
   background-color: #ffebee;
 }
+
+/* Date Filter Styling */
+
+.date-filters {
+  margin-bottom: 20px;
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 5px;
+  border: 1px solid #e0e0e0;
+}
+
+.date-filters h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: flex-end;
+}
+
+.filter-controls .form-group {
+  flex: 1;
+  min-width: 180px;
+}
+
+.btn-reset {
+  background-color: #607d8b;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  height: 38px;
+}
+
+.btn-reset:hover {
+  background-color: #546e7a;
+}
+
+.btn-complete {
+  background-color: #9c27b0;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-right: 5px;
+}
+
+.btn-complete:hover {
+  background-color: #8e24aa;
+}
+
+.btn-used {
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-right: 5px;
+}
+
+.btn-used:hover {
+  background-color: #f57c00;
+}
+
+/*view oeders*/
+
+.order-details-modal {
+  width: 90%;
+  max-width: 900px;
+}
+
+.order-summary {
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid #e0e0e0;
+}
+
+.summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.summary-row:last-child {
+  margin-bottom: 0;
+}
+
+.summary-item {
+  flex: 1;
+  min-width: 200px;
+  padding: 5px 10px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
 </style>
