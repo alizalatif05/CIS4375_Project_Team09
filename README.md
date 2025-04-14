@@ -1,6 +1,13 @@
 # CIS4375_Team09_Project
 
-This template should help get you started developing with Vue 3 in Vite.
+This will help guide you to start a local instance of the project.
+
+1) Navigate to frontend and backend folders via the terminal and run NPM install.
+2) Ensure you have a SQL DB to test the backend (MySQL Recommended).
+3) Use script under InfrastructureAsCode folder to set up DB with minimal required data.
+4) Edit .env (in backend folder) for connect to your local SQL connection.
+5) backend - NPM start
+6) frontend - npm run dev
 
 ## Recommended IDE Setup
 
@@ -9,6 +16,7 @@ This template should help get you started developing with Vue 3 in Vite.
 ## Customize configuration
 
 See [Vite Configuration Reference](https://vite.dev/config/).
+
 
 ## Project Setup
 
@@ -28,8 +36,4 @@ npm run dev
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
 
-```sh
-npm run lint
-```
