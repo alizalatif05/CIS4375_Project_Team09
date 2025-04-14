@@ -93,7 +93,7 @@ router.post('/inventory', authenticateUser, async (req, res) => {
     try {
         const { itemName, itemDesc, itemQuantity } = req.body;
 
-        if (!itemName || !itemQuantity) {
+        if (!itemName || itemQuantity === undefined || itemQuantity === null) {
             return res.status(400).json({ message: 'Item name and quantity are required' });
         }
 
