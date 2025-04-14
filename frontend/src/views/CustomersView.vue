@@ -226,7 +226,7 @@ export default {
         };
 
         if (this.editingCustomer) {
-          await api.fetchData(`/customers/${this.editingCustomer.CustomerID}`, {
+          await api.fetchData(`/customer/${this.editingCustomer.CustomerID}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json'
@@ -234,7 +234,7 @@ export default {
             body: JSON.stringify(customerData)
           });
         } else {
-          await api.fetchData('/customers', {
+          await api.fetchData('/customer', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
@@ -254,7 +254,7 @@ export default {
     async deleteCustomer(customerID) {
       if (confirm('Are you sure you want to delete this customer?')) {
         try {
-          await api.fetchData(`/customers/${customerID}`, {
+          await api.fetchData(`/customer/${customerID}`, {
             method: 'DELETE'
           });
           await this.loadCustomers();
