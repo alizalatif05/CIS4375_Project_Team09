@@ -665,7 +665,9 @@ export default {
           await api.fetchData(`/techinventory/${sku}/${techId}`, {
             method: 'DELETE'
           });
-          await this.loadTechnicianInventory();
+          await this.loadTechnicianInventory(),
+                this.loadInventory();
+
         } catch (error) {
           console.error('Error removing assignment:', error);
           alert(`Error removing assignment: ${error.message}`);
