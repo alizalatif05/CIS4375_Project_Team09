@@ -6,13 +6,9 @@ const { authenticateUser, authorizeAdmin } = require('../middleware/authMiddlewa
 const bcrypt = require('bcrypt');
 const router = express.Router(); 
 
-/** 
- *  INVENTORY ROUTES
- */
-
-/**
+/***********************************
  * GET /api/inventory - Retrieve all inventory items
- */
+ ***********************************/
 router.get('/inventory', authenticateUser, async (req, res) => {
     try {
         const { search } = req.query;
@@ -37,9 +33,9 @@ router.get('/inventory', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/***************************
  * GET /api/inventory/:sku - Retrieve a single inventory item by SKU
- */
+ **************************/
 router.get('/inventory/:sku', authenticateUser, async (req, res) => {
     try {
         const query = `
@@ -56,9 +52,9 @@ router.get('/inventory/:sku', authenticateUser, async (req, res) => {
 });
 
 
-/** 
- *  CUSTOMER ROUTES
- */
+/********************************** 
+ *  GET APIs for CUSTOMER ROUTES
+ **********************************/
 
 router.get('/customers', authenticateUser, async (req, res) => {
     try {
@@ -85,9 +81,9 @@ router.get('/customers', authenticateUser, async (req, res) => {
     }
 });
 
-/**
- *  TECHNICIAN ROUTES
-  */
+/***********************************
+ *  GET APIs for TECHNICIAN ROUTES
+  **********************************/
 
 router.get('/technicians', authenticateUser, async (req, res) => {
     try {
@@ -113,32 +109,13 @@ router.get('/technicians', authenticateUser, async (req, res) => {
     }
 });
 
+/********************* 
+ *  Inventory ROUTES
+ *********************/
 
-/**
- * DELETE /api/technicians/:id - Soft delete a technician
- */
-router.delete('/technicians/:id', authenticateUser, async (req, res) => {
-    try {
-        console.log('Deleting technician with ID:', req.params.id);
-        const query = 'UPDATE Technician SET Deleted = "Yes" WHERE TechID = ?';
-        const [result] = await pool.query(query, [req.params.id]);
-        
-        if (result.affectedRows === 0) {
-            console.log('No technician found with ID:', req.params.id);
-            return res.status(404).json({ message: 'Technician not found' });
-        }
-        
-        console.log('Successfully deleted technician with ID:', req.params.id);
-        res.json({ message: 'Technician soft deleted successfully' });
-    } catch (err) {
-        console.error('Database delete error:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/**
+/**************************
  * GET /api/techinventory - Retrieve all active technician inventory items with quantity
- */
+ *************************/
 router.get('/techinventory', authenticateUser, async (req, res) => {
     try {
         // Select Quantity from TechInventory table
@@ -161,7 +138,165 @@ router.get('/techinventory', authenticateUser, async (req, res) => {
     }
 });
 
-// Put for inventory edit updates
+
+/********************* 
+ *  ORDER ROUTES
+ *********************/
+
+/**************************
+ * GET /api/orders - Retrieve all orders
+ *************************/
+
+router.get('/orders', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM `Order` WHERE Deleted = "No"');
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching orders:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * GET /api/orders/:id - Retrieve specific orders
+ *************************/
+
+router.get('/orders/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM `Order` WHERE OrderID = ?', [req.params.id]);
+        res.json(results[0] || {});
+    } catch (err) {
+        console.error('Error fetching order by ID:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * GET /api/orders/:id/items - Retrieve specific item for a specific order
+ *************************/
+
+router.get('/orders/:id/items', authenticateUser, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const query = `
+            SELECT oi.SKU_Number, oi.OrderID, oi.QTY, 
+                i.ItemName, i.Item_Desc 
+            FROM OrderItems oi
+            JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
+            WHERE oi.OrderID = ? AND oi.Deleted = 'No';
+        `;
+
+        const [results] = await pool.query(query, [orderId]);
+        res.json(results); // Return array of items
+    } catch (err) {
+        console.error('Error fetching items for order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * GET /api/orderitems - Retrieve all order items
+ *************************/
+
+router.get('/orderitems', authenticateUser, async (req, res) => {
+    try {
+        const query = `
+            SELECT OrderItems.SKU_Number, OrderItems.OrderID, OrderItems.QTY,
+                Inventory.ItemName, Inventory.Item_Desc 
+            FROM OrderItems
+            JOIN Inventory ON OrderItems.SKU_Number = Inventory.SKU_Number
+            WHERE OrderItems.Deleted = 'No';
+        `;
+
+        const [results] = await pool.query(query);
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching order items:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/******************
+ * ADMIN ROUTES
+ *****************/
+
+/***********************
+ * GET /api/admins - Retrieve all admin users
+ **********************/
+router.get('/admins', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        const query = `
+            SELECT AdminID, UserID, Admin_fName AS firstName, Admin_lName AS lastName 
+            FROM Admin;
+        `;
+
+        const [results] = await pool.query(query);
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching admins:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/********************************* 
+ *  SALES REPRESENTATIVE ROUTES
+ *********************************/
+
+/***********************
+ * GET /api/sales_reps - Retrieve all sales reps
+ **********************/
+
+router.get('/sales_reps', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM SalesRep WHERE Deleted = "No"');
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching sales reps:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+router.get('/sales_reps/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM SalesRep WHERE SalesRepID = ?', [req.params.id]);
+        res.json(results[0] || {});
+    } catch (err) {
+        console.error('Error fetching sales rep by ID:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/*********************** 
+ *  USER ROUTES
+ ***********************/
+
+/***********************
+ * GET /api/user - Retrieve all users
+ **********************/
+
+router.get('/user', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM User');
+        res.json(results);
+    } catch (err) {
+        console.error('Error fetching users:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+router.get('/user/:id', authenticateUser, async (req, res) => {
+    try {
+        const [results] = await pool.query('SELECT * FROM User WHERE UserID = ?', [req.params.id]);
+        res.json(results[0] || {});
+    } catch (err) {
+        console.error('Error fetching user by ID:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/********************************* 
+* PUT /api/techinventory/:oldSku/:oldTechId - for Updating inventory
+**********************************/
 
 router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, res) => {
     try {
@@ -266,75 +401,9 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
 });
 
 
-/** 
- *  ORDER ROUTES
- */
-
-// Get all orders
-router.get('/orders', authenticateUser, async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM `Order` WHERE Deleted = "No"');
-        res.json(results);
-    } catch (err) {
-        console.error('Error fetching orders:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-// Get a specific order
-router.get('/orders/:id', authenticateUser, async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM `Order` WHERE OrderID = ?', [req.params.id]);
-        res.json(results[0] || {});
-    } catch (err) {
-        console.error('Error fetching order by ID:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-// Get items for a specific order
-router.get('/orders/:id/items', authenticateUser, async (req, res) => {
-    try {
-        const orderId = req.params.id;
-        const query = `
-            SELECT oi.SKU_Number, oi.OrderID, oi.QTY, 
-                i.ItemName, i.Item_Desc 
-            FROM OrderItems oi
-            JOIN Inventory i ON oi.SKU_Number = i.SKU_Number
-            WHERE oi.OrderID = ? AND oi.Deleted = 'No';
-        `;
-
-        const [results] = await pool.query(query, [orderId]);
-        res.json(results); // Return array of items
-    } catch (err) {
-        console.error('Error fetching items for order:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-// Get all order items
-router.get('/orderitems', authenticateUser, async (req, res) => {
-    try {
-        const query = `
-            SELECT OrderItems.SKU_Number, OrderItems.OrderID, OrderItems.QTY,
-                Inventory.ItemName, Inventory.Item_Desc 
-            FROM OrderItems
-            JOIN Inventory ON OrderItems.SKU_Number = Inventory.SKU_Number
-            WHERE OrderItems.Deleted = 'No';
-        `;
-
-        const [results] = await pool.query(query);
-        res.json(results);
-    } catch (err) {
-        console.error('Error fetching order items:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-
-/**
+/*********************************
  * PUT /api/orderitems/:orderId/:sku - Update a specific order item
- */
+ *********************************/
 router.put('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
     try {
         const { orderId, sku } = req.params;
@@ -395,151 +464,9 @@ router.put('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
     }
 });
 
-/**
- * ADMIN ROUTES
- **/
-
-/**
- * GET /api/admins - Retrieve all admin users
- */
-router.get('/admins', authenticateUser, authorizeAdmin, async (req, res) => {
-    try {
-        const query = `
-            SELECT AdminID, UserID, Admin_fName AS firstName, Admin_lName AS lastName 
-            FROM Admin;
-        `;
-
-        const [results] = await pool.query(query);
-        res.json(results);
-    } catch (err) {
-        console.error('Error fetching admins:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/** 
- *  SALES REPRESENTATIVE ROUTES
- */
-
-router.get('/sales_reps', authenticateUser, async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM SalesRep WHERE Deleted = "No"');
-        res.json(results);
-    } catch (err) {
-        console.error('Error fetching sales reps:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-router.get('/sales_reps/:id', authenticateUser, async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM SalesRep WHERE SalesRepID = ?', [req.params.id]);
-        res.json(results[0] || {});
-    } catch (err) {
-        console.error('Error fetching sales rep by ID:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/**
- * DELETE /api/sales_reps/:id - Soft delete a sales representative
- */
-router.delete('/sales_reps/:id', authenticateUser, async (req, res) => {
-    try {
-        console.log('Deleting sales rep with ID:', req.params.id);
-        const query = 'UPDATE SalesRep SET Deleted = "Yes" WHERE SalesRepID = ?';
-        const [result] = await pool.query(query, [req.params.id]);
-        
-        if (result.affectedRows === 0) {
-            console.log('No sales rep found with ID:', req.params.id);
-            return res.status(404).json({ message: 'Sales representative not found' });
-        }
-        
-        console.log('Successfully deleted sales rep with ID:', req.params.id);
-        res.json({ message: 'Sales representative soft deleted successfully' });
-    } catch (err) {
-        console.error('Database delete error:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/** 
- *  USER ROUTES
- */
-
-router.get('/user', authenticateUser, async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM User');
-        res.json(results);
-    } catch (err) {
-        console.error('Error fetching users:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-router.get('/user/:id', authenticateUser, async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM User WHERE UserID = ?', [req.params.id]);
-        res.json(results[0] || {});
-    } catch (err) {
-        console.error('Error fetching user by ID:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-// Create user and hash password
-router.post('/user', authenticateUser, authorizeAdmin, async (req, res) => {
-    try {
-        const { User_fName, User_lName, Username, UserPassword, UserType } = req.body;
-
-        if (!User_fName || !User_lName || !Username || !UserPassword || !UserType) {
-            return res.status(400).json({ message: 'Missing required fields'});
-        }
-
-        // Hash the password with bcrypt before storing it
-        const hashedPassword = await bcrypt.hash(UserPassword, 10);
-
-        const user = {
-            User_fName,
-            User_lName,
-            Username,
-            UserPassword: hashedPassword, // Store the hashed password
-            UserType,
-            Deleted: 'No'
-        };
-
-        const [result] = await pool.query('INSERT INTO User SET ?', [user]);
-        res.status(201).json({ message: 'User created successfully', id: result.insertId });
-    } catch (err) {
-        console.error('Error creating user:', err);
-        res.status(500).json({ message: 'Error with database', error: err.message });
-    }
-});
-
-/**
- * DELETE /api/users/:id - Soft delete a user
- */
-router.delete('/users/:id', authenticateUser, authorizeAdmin, async (req, res) => {
-    try {
-        console.log('Deleting user with ID:', req.params.id);
-        const query = 'UPDATE User SET Deleted = "Yes" WHERE UserID = ?';
-        const [result] = await pool.query(query, [req.params.id]);
-        
-        if (result.affectedRows === 0) {
-            console.log('No user found with ID:', req.params.id);
-            return res.status(404).json({ message: 'User not found' });
-        }
-        
-        console.log('Successfully deleted user with ID:', req.params.id);
-        res.json({ message: 'User soft deleted successfully' });
-    } catch (err) {
-        console.error('Database delete error:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-/**
+/***************************
  * PUT /api/inventory/:id - Update an existing inventory item
- */
+ ***************************/
 router.put('/inventory/:id', authenticateUser, async (req, res) => {
     try {
         const inventoryId = req.params.id;
@@ -569,9 +496,9 @@ router.put('/inventory/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/**************************
  * PUT /api/customers/:id - Update an existing customer record (supports partial updates)
- */
+ **************************/
 router.put('/customer/:id', authenticateUser, async (req, res) => {
     try {
         const customerId = req.params.id;
@@ -622,9 +549,9 @@ router.put('/customer/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/*******************************
  * PUT APIs PUT /api/orders/:id - Update an existing order 
- */
+ *******************************/
 router.put('/orders/:id', authenticateUser, async (req, res) => {
     try {
         const orderId = req.params.id;
@@ -653,7 +580,11 @@ router.put('/orders/:id', authenticateUser, async (req, res) => {
     }
 });
 
-// Update user and hash password if provided
+
+/*******************************
+ * PUT APIs PUT /api/users/:id - Update an existing user and hash password if provided
+ *******************************/
+
 router.put('/users/:id', authenticateUser, async (req, res) => {
     try {
         const userId = req.params.id;
@@ -698,9 +629,9 @@ router.put('/users/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/**
- * PUT sales rep
- */
+/*****************
+ * PUT /api/sales_reps/:id - Update a specific sales rep with ID
+ *****************/
 router.put('/sales_reps/:id', authenticateUser, async (req, res) => {
     try {
         const repId = req.params.id;
@@ -729,9 +660,9 @@ router.put('/sales_reps/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/****************************
  * PUT /api/technicians/:id - Update a technician
- */
+ ****************************/
 router.put('/technicians/:id', authenticateUser, async (req, res) => {
     try {
         const techId = req.params.id;
@@ -760,9 +691,43 @@ router.put('/technicians/:id', authenticateUser, async (req, res) => {
     }
 });
 
-/** 
- * POST APIs (Creating New Records)
- */
+
+/*********************** 
+ * POST APIs /api/user - Creating user and hash password
+ ***********************/
+
+router.post('/user', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        const { User_fName, User_lName, Username, UserPassword, UserType } = req.body;
+
+        if (!User_fName || !User_lName || !Username || !UserPassword || !UserType) {
+            return res.status(400).json({ message: 'Missing required fields'});
+        }
+
+        // Hash the password with bcrypt before storing it
+        const hashedPassword = await bcrypt.hash(UserPassword, 10);
+
+        const user = {
+            User_fName,
+            User_lName,
+            Username,
+            UserPassword: hashedPassword, // Store the hashed password
+            UserType,
+            Deleted: 'No'
+        };
+
+        const [result] = await pool.query('INSERT INTO User SET ?', [user]);
+        res.status(201).json({ message: 'User created successfully', id: result.insertId });
+    } catch (err) {
+        console.error('Error creating user:', err);
+        res.status(500).json({ message: 'Error with database', error: err.message });
+    }
+});
+
+
+/*************************** 
+ * POST APIs /api/inventory - Creating New Records
+ ***************************/
 router.post('/inventory', authenticateUser, async (req, res) => {
     try {
         const { itemName, itemDesc, itemQuantity } = req.body;
@@ -784,9 +749,9 @@ router.post('/inventory', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/******************************
  * POST /api/customers - Add a new customer
- */
+ ******************************/
 router.post('/customers', authenticateUser, async (req, res) => {
     try {
         const { firstName, lastName, address, phone } = req.body;
@@ -808,9 +773,9 @@ router.post('/customers', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/*************************
  * POST /api/technicians - Add a new technician
- */
+ *************************/
 router.post('/technicians', authenticateUser, async (req, res) => {
     try {
         const { Tech_fName, Tech_lName, UserID } = req.body;
@@ -832,9 +797,9 @@ router.post('/technicians', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/************************
  * POST /api/sales_reps - Add a new sales rep
- */
+ ************************/
 router.post('/sales_reps', authenticateUser, async (req, res) => {
     try {
         const { SalesRep_fName, SalesRep_lName, UserID } = req.body;
@@ -856,9 +821,9 @@ router.post('/sales_reps', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/************************
  * POST /api/orders - Create a new order
- */
+ ************************/
 router.post('/orders', authenticateUser, async (req, res) => {
     try {
         const { customerID, techID, salesRepID } = req.body;
@@ -880,9 +845,9 @@ router.post('/orders', authenticateUser, async (req, res) => {
     }
 });
 
-/**
+/**************************
  * POST /api/orderitems - Add items to an order or update quantities if item exists
- */
+ ***************************/
 router.post('/orderitems', authenticateUser, async (req, res) => {
     const { skuNumber, orderID, QTY } = req.body;
     const quantity = QTY || 1; // Default to 1 if no quantity provided
@@ -948,94 +913,10 @@ router.post('/orderitems', authenticateUser, async (req, res) => {
     }
 });
 
-/**
- * DELETE /api/orders/:id - Soft delete an order
- */
-router.delete('/orders/:id', authenticateUser, async (req, res) => {
-    try {
-        const [result] = await pool.query('UPDATE `Order` SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id]);
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Order not found' });
-        }
 
-        // Also soft delete all associated order items
-        await pool.query('UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id]);
-        
-        res.json({ message: 'Order and all items soft deleted' });
-    } catch (err) {
-        console.error('Error deleting order:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/**
- * DELETE /api/orderitems/:orderId/:sku - Soft delete a specific item from an order
- */
-router.delete('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
-    try {
-        const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ? AND SKU_Number = ?';
-        const [result] = await pool.query(query, [req.params.orderId, req.params.sku]);
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message: 'Order item not found or already deleted'
-            });
-        }
-        
-        res.json({ message: 'Order item soft deleted' });
-    } catch (err) {
-        console.error('Error deleting order item:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/**
- * DELETE /api/orderitems/:orderId - Soft delete all items from an order
- */
-router.delete('/orderitems/:orderId', authenticateUser, async (req, res) => {
-    try {
-        const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?';
-        const [result] = await pool.query(query, [req.params.orderId]);
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message: 'No order items found or already deleted'
-            });
-        }
-        
-        res.json({
-            message: `All items from order ${req.params.orderId} soft deleted`,
-            count: result.affectedRows
-        });
-    } catch (err) {
-        console.error('Error deleting order items:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/**
- * DELETE API for Customer
- */
-router.delete('/customers/:id', authenticateUser, async (req, res) => {
-    try {
-        const query = 'UPDATE Customer SET Deleted = "Yes" WHERE CustomerID = ?';
-        const [result] = await pool.query(query, [req.params.id]);
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Customer not found' });
-        }
-        
-        res.json({ message: 'Customer soft deleted' });
-    } catch (err) {
-        console.error('Error deleting customer:', err);
-        res.status(500).json({ message: 'Database query error', error: err.message });
-    }
-});
-
-/**
+/**************************
  * POST /api/techinventory - Assign an item with quantity to a technician
- */
+ **************************/
 router.post('/techinventory', authenticateUser, async (req, res) => {
     // 'quantity' from the request now represents the amount to ADD or the initial amount
     const { skuNumber, techId, QTY } = req.body;
@@ -1161,31 +1042,160 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
     }
 });
 
-// DELETE /api/inventory/:sku - Soft delete an inventory item
-
-router.delete('/inventory/:sku', authenticateUser, async (req, res) => {
+/******************************
+ * DELETE /api/technicians/:id - Soft delete a technician
+ ******************************/
+router.delete('/technicians/:id', authenticateUser, async (req, res) => {
     try {
-        console.log('Deleting inventory item with SKU:', req.params.sku);
-        const query = 'UPDATE Inventory SET Deleted = "Yes" WHERE SKU_Number = ?';
-        const [result] = await pool.query(query, [req.params.sku]);
+        console.log('Deleting technician with ID:', req.params.id);
+        const query = 'UPDATE Technician SET Deleted = "Yes" WHERE TechID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
         
         if (result.affectedRows === 0) {
-            console.log('No inventory item found with SKU:', req.params.sku);
-            return res.status(404).json({ message: 'Inventory item not found' });
+            console.log('No technician found with ID:', req.params.id);
+            return res.status(404).json({ message: 'Technician not found' });
         }
- 
-        console.log('Successfully deleted inventory item with SKU:', req.params.sku);
-        res.json({ message: 'Inventory item soft deleted successfully' });
+        
+        console.log('Successfully deleted technician with ID:', req.params.id);
+        res.json({ message: 'Technician soft deleted successfully' });
     } catch (err) {
         console.error('Database delete error:', err);
         res.status(500).json({ message: 'Database query error', error: err.message });
     }
- })
+});
 
+/*****************************
+ * DELETE /api/sales_reps/:id - Soft delete a sales representative
+ *****************************/
+router.delete('/sales_reps/:id', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting sales rep with ID:', req.params.id);
+        const query = 'UPDATE SalesRep SET Deleted = "Yes" WHERE SalesRepID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No sales rep found with ID:', req.params.id);
+            return res.status(404).json({ message: 'Sales representative not found' });
+        }
+        
+        console.log('Successfully deleted sales rep with ID:', req.params.id);
+        res.json({ message: 'Sales representative soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
 
-/**
+/************************
+ * DELETE /api/users/:id - Soft delete a user
+ ************************/
+router.delete('/users/:id', authenticateUser, authorizeAdmin, async (req, res) => {
+    try {
+        console.log('Deleting user with ID:', req.params.id);
+        const query = 'UPDATE User SET Deleted = "Yes" WHERE UserID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No user found with ID:', req.params.id);
+            return res.status(404).json({ message: 'User not found' });
+        }
+        
+        console.log('Successfully deleted user with ID:', req.params.id);
+        res.json({ message: 'User soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * DELETE /api/orders/:id - Soft delete an order
+ **************************/
+router.delete('/orders/:id', authenticateUser, async (req, res) => {
+    try {
+        const [result] = await pool.query('UPDATE `Order` SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // Also soft delete all associated order items
+        await pool.query('UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?', [req.params.id]);
+        
+        res.json({ message: 'Order and all items soft deleted' });
+    } catch (err) {
+        console.error('Error deleting order:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * DELETE /api/orderitems/:orderId/:sku - Soft delete a specific item from an order
+ **************************/
+router.delete('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
+    try {
+        const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ? AND SKU_Number = ?';
+        const [result] = await pool.query(query, [req.params.orderId, req.params.sku]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'Order item not found or already deleted'
+            });
+        }
+        
+        res.json({ message: 'Order item soft deleted' });
+    } catch (err) {
+        console.error('Error deleting order item:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * DELETE /api/orderitems/:orderId - Soft delete all items from an order
+ **************************/
+router.delete('/orderitems/:orderId', authenticateUser, async (req, res) => {
+    try {
+        const query = 'UPDATE OrderItems SET Deleted = "Yes" WHERE OrderID = ?';
+        const [result] = await pool.query(query, [req.params.orderId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                message: 'No order items found or already deleted'
+            });
+        }
+        
+        res.json({
+            message: `All items from order ${req.params.orderId} soft deleted`,
+            count: result.affectedRows
+        });
+    } catch (err) {
+        console.error('Error deleting order items:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**************************
+ * DELETE API /api/customers/:id - for Customer
+ ***************************/
+router.delete('/customers/:id', authenticateUser, async (req, res) => {
+    try {
+        const query = 'UPDATE Customer SET Deleted = "Yes" WHERE CustomerID = ?';
+        const [result] = await pool.query(query, [req.params.id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+        
+        res.json({ message: 'Customer soft deleted' });
+    } catch (err) {
+        console.error('Error deleting customer:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/*****************************
  * DELETE /api/techinventory/:sku/:techId - Soft delete a technician's inventory assignment (return item to main inventory)
- */
+ *****************************/
 router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) => {
     const { sku, techId } = req.params;
     let connection;
@@ -1247,5 +1257,30 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
         if (connection) connection.release(); // Always release connection
     }
 });
+
+/*****************************
+ * DELETE /api/inventory/:sku - Soft delete an inventory item
+ *****************************/
+
+router.delete('/inventory/:sku', authenticateUser, async (req, res) => {
+    try {
+        console.log('Deleting inventory item with SKU:', req.params.sku);
+        const query = 'UPDATE Inventory SET Deleted = "Yes" WHERE SKU_Number = ?';
+        const [result] = await pool.query(query, [req.params.sku]);
+        
+        if (result.affectedRows === 0) {
+            console.log('No inventory item found with SKU:', req.params.sku);
+            return res.status(404).json({ message: 'Inventory item not found' });
+        }
+ 
+        console.log('Successfully deleted inventory item with SKU:', req.params.sku);
+        res.json({ message: 'Inventory item soft deleted successfully' });
+    } catch (err) {
+        console.error('Database delete error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+ });
+
+
 
 module.exports = router;
