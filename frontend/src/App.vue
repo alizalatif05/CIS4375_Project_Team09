@@ -102,7 +102,7 @@ export default {
 
 /* Header styles */
 .main-header {
-  background: linear-gradient(to right, #2c3e50, #3498db);
+  background: linear-gradient(to left, #2c3e50, #3498db);
   color: white;
   padding: 0.5rem 2rem;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
