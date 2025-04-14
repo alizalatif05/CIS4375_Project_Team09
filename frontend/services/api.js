@@ -153,21 +153,21 @@ export default {
   async getInventoryItem(sku) {
     return this.fetchData(`/inventory/${sku}`);
   },
-  
+
   async createInventoryItem(itemData) {
     return this.fetchData('/inventory', {
       method: 'POST',
       body: JSON.stringify(itemData)
     });
   },
-  
+
   async updateInventoryItem(sku, itemData) {
     return this.fetchData(`/inventory/${sku}`, {
       method: 'PUT',
       body: JSON.stringify(itemData)
     });
   },
-  
+
   async deleteInventoryItem(sku) {
     return this.fetchData(`/inventory/${sku}`, {
       method: 'DELETE'
@@ -178,21 +178,21 @@ export default {
   async getTechInventory() {
     return this.fetchData('/techinventory');
   },
-  
+
   async assignTechInventory(techInventoryData) {
     return this.fetchData('/techinventory', {
       method: 'POST',
       body: JSON.stringify(techInventoryData)
     });
   },
-  
+
   async updateTechInventory(oldSku, oldTechId, updateData) {
     return this.fetchData(`/techinventory/${oldSku}/${oldTechId}`, {
       method: 'PUT',
       body: JSON.stringify(updateData)
     });
   },
-  
+
   async deleteTechInventory(sku, techId) {
     return this.fetchData(`/techinventory/${sku}/${techId}`, {
       method: 'DELETE'
@@ -203,7 +203,7 @@ export default {
   async getOrderItems() {
     return this.fetchData('/orderitems');
   },
-  
+
   async getOrderItemsForOrder(orderId) {
     return this.fetchData(`/orders/${orderId}/items`);
   },
@@ -214,7 +214,7 @@ export default {
       body: JSON.stringify(orderItemData)
     });
   },
-  
+
   async updateOrderItem(orderId, sku, updateData) {
     return this.fetchData(`/orderitems/${orderId}/${sku}`, {
       method: 'PUT',
@@ -227,7 +227,7 @@ export default {
       method: 'DELETE'
     });
   },
-  
+
   async deleteAllOrderItems(orderId) {
     return this.fetchData(`/orderitems/${orderId}`, {
       method: 'DELETE'
@@ -250,21 +250,21 @@ async markItemAsUsed(orderId, sku) {
   async getOrder(id) {
     return this.fetchData(`/orders/${id}`);
   },
-  
+
   async createOrder(orderData) {
     return this.fetchData('/orders', {
       method: 'POST',
       body: JSON.stringify(orderData)
     });
   },
-  
+
   async updateOrder(id, orderData) {
     return this.fetchData(`/orders/${id}`, {
       method: 'PUT',
       body: JSON.stringify(orderData)
     });
   },
-  
+
   async deleteOrder(id) {
     return this.fetchData(`/orders/${id}`, {
       method: 'DELETE'
@@ -278,41 +278,41 @@ async completeOrder(id) {
     body: JSON.stringify({})
   });
 },
-  
+
   // --------- CUSTOMERS ---------
   async getCustomers() {
-    return this.fetchData('/customers');
+    return this.fetchData('/customer');
   },
-  
+
   async getCustomer(id) {
-    return this.fetchData(`/customers/${id}`);
+    return this.fetchData(`/customer/${id}`);
   },
-  
+
   async createCustomer(customerData) {
-    return this.fetchData('/customers', {
+    return this.fetchData('/customer', {
       method: 'POST',
       body: JSON.stringify(customerData)
     });
   },
-  
+
   async updateCustomer(id, customerData) {
     return this.fetchData(`/customer/${id}`, { // Note: Your backend uses singular 'customer' here
       method: 'PUT',
       body: JSON.stringify(customerData)
     });
   },
-  
+
   async deleteCustomer(id) {
-    return this.fetchData(`/customers/${id}`, {
+    return this.fetchData(`/customer/${id}`, {
       method: 'DELETE'
     });
   },
-  
+
   // --------- ADMINS ---------
   async getAdmins() {
     return this.fetchData('/admins');
   },
-  
+
   // --------- AUTHENTICATION ---------
   async login(credentials) {
     try {
@@ -320,41 +320,41 @@ async completeOrder(id) {
         method: 'POST',
         body: JSON.stringify(credentials)
       });
-      
+
       if (data && data.token) {
         localStorage.setItem('token', data.token);
         console.log('Token saved to localStorage:', data.token.substring(0, 20) + '...');
       }
-      
+
       return data;
     } catch (error) {
       throw new Error('Login failed: ' + error.message);
     }
   },
-  
+
   async adminLogin(credentials) {
     try {
       const data = await this.fetchData('/auth/admin-login', {
         method: 'POST',
         body: JSON.stringify(credentials)
       });
-      
+
       if (data && data.token) {
         localStorage.setItem('token', data.token);
         console.log('Admin token saved to localStorage:', data.token.substring(0, 20) + '...');
       }
-      
+
       return data;
     } catch (error) {
       throw new Error('Admin login failed: ' + error.message);
     }
   },
-  
+
   logout() {
     localStorage.removeItem('token');
     console.log('Token removed from localStorage');
   },
-  
+
   isAuthenticated() {
     const token = localStorage.getItem('token');
     return !!token;

@@ -23,17 +23,17 @@
         <option value="completed">Date Completed</option>
       </select>
     </div>
-    
+
     <div class="form-group">
       <label>Start Date:</label>
       <input type="date" v-model="dateFilters.startDate">
     </div>
-    
+
     <div class="form-group">
       <label>End Date:</label>
       <input type="date" v-model="dateFilters.endDate">
     </div>
-    
+
     <button @click="resetDateFilters" class="btn-reset">Reset Filters</button>
   </div>
 </div>
@@ -114,7 +114,7 @@
                 </div>
               </div>
             </div>
-            
+
             <h3>Order Items</h3>
             <div v-if="loading.orderItems" class="loading">Loading order items...</div>
             <div v-else-if="error.orderItems" class="error-message">
@@ -135,7 +135,7 @@
                 <tr v-for="item in orderItems" :key="item.SKU_Number">
                   <td>{{ item.ItemName }}</td>
                   <td>{{ item.SKU_Number }}</td>
-                  <td>{{ item.QTY }}</td>
+                  <td>{{ item.OrderItems_Quantity }}</td>
                   <td>{{ formatDate(item.DateAdded) }}</td>
                   <td>{{ formatDate(item.DateUsed) }}</td>
                   <td>
@@ -146,7 +146,7 @@
                 </tr>
               </tbody>
             </table>
-            
+
             <div class="modal-actions">
               <button @click="showAddItems(selectedOrder)" class="btn-add">Add Items</button>
               <button v-if="!selectedOrder.DateCompleted" @click="completeOrder(selectedOrder.OrderID)" class="btn-complete">Complete Order</button>
@@ -309,7 +309,7 @@
         </div>
       </div>
     </div>
-  </div> 
+  </div>
   </div>
   </template>
 
@@ -374,7 +374,7 @@ export default {
       expandedOrder: null,       // OrderID of the currently expanded order, or null
       selectedOrder: null,       // The order object currently selected for actions (e.g., adding items)
       editingOrder: null,        // The order object being edited, or null if creating
-      
+
       // Form data for creating/editing an order
        orderForm: {
         CustomerID: '',
@@ -423,15 +423,15 @@ export default {
       if (!this.dateFilters.startDate && !this.dateFilters.endDate) {
         return this.orders; // Return all orders if no date filters applied
       }
-      
+
       // Convert string dates to Date objects for comparison
       const startDate = this.dateFilters.startDate ? new Date(this.dateFilters.startDate) : null;
       const endDate = this.dateFilters.endDate ? new Date(this.dateFilters.endDate) : null;
-      
+
       return this.orders.filter(order => {
         // Determine which date field to filter on
         let orderDate;
-        
+
         switch(this.dateFilters.filterBy) {
           case 'created':
             orderDate = new Date(order.DateCreated);
@@ -447,25 +447,25 @@ export default {
           default:
             orderDate = new Date(order.DateCreated);
         }
-        
+
         // Apply date range filtering
         let matchesStart = true;
         let matchesEnd = true;
-        
+
         if (startDate) {
           // Set hours to 0 for start date comparison (beginning of day)
           const adjustedStartDate = new Date(startDate);
           adjustedStartDate.setHours(0, 0, 0, 0);
           matchesStart = orderDate >= adjustedStartDate;
         }
-        
+
         if (endDate) {
           // Set hours to 23:59:59 for end date comparison (end of day)
           const adjustedEndDate = new Date(endDate);
           adjustedEndDate.setHours(23, 59, 59, 999);
           matchesEnd = orderDate <= adjustedEndDate;
         }
-        
+
         return matchesStart && matchesEnd;
       });
     },
@@ -500,7 +500,7 @@ export default {
     editOrder(order) {
       // Store the order being edited
       this.editingOrder = order;
-      
+
       // Populate the form with the order's current data
       this.orderForm = {
         CustomerID: order.CustomerID,
@@ -508,7 +508,7 @@ export default {
         TechID: order.TechID,
         Items: [] // Items are handled separately
       };
-      
+
       // Display the edit form modal
       this.showOrderCreateForm = true;
     },
@@ -520,7 +520,7 @@ export default {
       // Consider current quantity + available stock? Or just available stock? Assuming available stock for now.
       // If editing, it should probably be current quantity + remaining stock. Needs clarification based on backend logic.
       // For simplicity, returning available quantity from inventory.
-      return item ? item.Item_Quantity : 1; 
+      return item ? item.Item_Quantity : 1;
     },
 
     // Orchestrates loading of all necessary data for the component.
@@ -552,13 +552,13 @@ export default {
  // Fetches the detailed items for a specific order from the API.
     async loadOrderItems(orderID) {
       if (!orderID) return; // Don't proceed if no order ID is provided
-      
+
       this.loading.orderItems = true;
       this.error.orderItems = null;
       try {
         // Use the dedicated endpoint for order items
         const orderItems = await api.fetchData(`/orders/${orderID}/items`);
-        
+
         // Since we're now using the correct endpoint, we expect an array response
         if (Array.isArray(orderItems)) {
           this.orderItems = orderItems;
@@ -624,7 +624,7 @@ export default {
       this.error.inventory = null;
       try {
         const response = await api.getInventory();
-        console.log('Inventory response:', response); 
+        console.log('Inventory response:', response);
         if (Array.isArray(response)) {
           this.inventory = response;
         } else {
@@ -646,7 +646,7 @@ export default {
       if (confirm(`Are you sure you want to remove ${item.ItemName} (SKU: ${item.SKU_Number}) from this order?`)) {
         try {
           // Assuming api.deleteOrderItem takes orderID and skuNumber
-          await api.deleteOrderItem(this.expandedOrder, item.SKU_Number); 
+          await api.deleteOrderItem(this.expandedOrder, item.SKU_Number);
           // Refresh the order items list for the currently expanded order
           await this.loadOrderItems(this.expandedOrder);
         } catch (error) {
@@ -673,7 +673,7 @@ export default {
       const technician = this.technicians.find(t => t.TechID === techID);
       return technician ? `${technician.firstName} ${technician.lastName}` : 'Unknown';
     },
-    
+
     // Helper method: Finds and returns the item's name based on SKU number.
     getItemName(skuNumber) {
       const item = this.inventory.find(item => item.SKU_Number === skuNumber);
@@ -694,10 +694,10 @@ export default {
             await this.loadInventory();
           }
           // Reset the item selection form and list
-          this.selectedItems = []; 
+          this.selectedItems = [];
           this.itemToAdd = { SKU_Number: '', QTY: 1 };
           this.showAddItemsModal = true; // Open the modal
-          console.log('Available items for adding:', this.availableItems); 
+          console.log('Available items for adding:', this.availableItems);
         } catch (error) {
           console.error('Error preparing to add items:', error);
           this.error.inventory = 'Failed to load inventory items';
@@ -709,7 +709,7 @@ export default {
       this.editItemForm = {
         OrderID: this.expandedOrder,         // Get OrderID from the currently expanded order
         SKU_Number: item.SKU_Number,
-        QTY: item.QTY || 1,       // Use existing quantity or default to 1
+        QTY: item.OrderItems_QTY || 1,       // Use existing quantity or default to 1
         originalSKU: item.SKU_Number      // Store the original SKU
       };
       this.showEditItemModal = true;
@@ -729,44 +729,30 @@ export default {
     // Saves the edited order item via API (replaces old item with new details).
 async saveEditedItem() {
   try {
-    // Add more debugging to see exactly what's happening
-    console.log('Edit Item Form Data:', {
-      OrderID: this.editItemForm.OrderID,
-      SKU_Number: this.editItemForm.SKU_Number, 
-      originalSKU: this.editItemForm.originalSKU,
-      QTY: this.editItemForm.QTY
-    });
-    
-    // Make sure QTY is defined and valid
+    // Validate quantity
     if (!this.editItemForm.QTY || isNaN(Number(this.editItemForm.QTY)) || this.editItemForm.QTY < 1) {
       alert('Please enter a valid quantity (minimum 1)');
       return;
     }
 
-    // If we're not changing the SKU, set it to the original to avoid confusion
     const requestBody = {
       QTY: Number(this.editItemForm.QTY)
     };
-    
+
     // Only include skuNumber if it's actually changing
     if (this.editItemForm.SKU_Number !== this.editItemForm.originalSKU) {
       requestBody.skuNumber = this.editItemForm.SKU_Number;
     }
-    
-    console.log('Sending update request:', {
-      url: `/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`,
-      body: requestBody
-    });
-    
-    // Call the PUT endpoint
+
+    // Call the PUT endpoint with the correct URL structure
     await api.fetchData(`/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
     });
 
-    // Refresh the order items
-    await this.loadOrderItems(this.expandedOrder); 
+    // Refresh the order items and inventory
+    await this.loadOrderItems(this.expandedOrder);
     await this.loadInventory();
 
     this.cancelEditItem();
@@ -783,7 +769,7 @@ async saveEditedItem() {
       this.selectedItems = [];
       this.itemToAdd = { SKU_Number: '', QTY: 1 };
     },
-    
+
     // Helper method: Calculates max quantity for the item selected in the 'Add Items' modal.
     getMaxQuantity() {
       if (!this.itemToAdd.SKU_Number) return 1; // No item selected
@@ -831,14 +817,14 @@ async saveEditedItem() {
     // Format the date for MySQL
     const now = new Date();
     const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
-    
+
     // Reset the modal first - this should happen immediately
     const orderID = this.selectedOrder.OrderID;
     const isExpanded = this.expandedOrder === orderID;
-    
+
     // Close the modal immediately
     this.showAddItemsModal = false;
-    
+
     // Iterate through the list of items to add
     for (const item of this.selectedItems) {
       await api.fetchData('/orderitems', {
@@ -868,21 +854,21 @@ async saveEditedItem() {
       this.loadInventory(),
       this.loadOrders()
     ]);
-    
+
     // Refresh order items if needed
     if (isExpanded) {
       await this.loadOrderItems(orderID);
     }
-    
+
     // Reset state variables
     this.selectedOrder = null;
     this.selectedItems = [];
     this.itemToAdd = { SKU_Number: '', QTY: 1 };
-    
+
   } catch (error) {
     console.error('Error adding items to order:', error);
     alert(`Error adding items to order: ${error.message}`);
-    
+
     // Make sure to close the modal even on error
     this.showAddItemsModal = false;
     this.selectedOrder = null;
@@ -906,16 +892,16 @@ async saveEditedItem() {
       this.orderItems = [];
     },
 
-    
+
 
      // Add a method to mark items as used (by technician)
      async markItemAsUsed(item) {
       try {
         await api.markItemAsUsed(this.expandedOrder, item.SKU_Number);
-        
+
         // Refresh order items
         await this.loadOrderItems(this.expandedOrder);
-        
+
       } catch (error) {
         console.error('Error marking item as used:', error);
         alert(`Error updating item status: ${error.message}`);
@@ -929,14 +915,14 @@ async saveEditedItem() {
         if (!this.editingOrder) {
           this.orderForm.DateCreated = new Date().toISOString();
         }
-        
+
         // If a technician is assigned and there wasn't one before, update assignment date
-        if (this.orderForm.TechID && 
-            (!this.editingOrder || !this.editingOrder.TechID || 
+        if (this.orderForm.TechID &&
+            (!this.editingOrder || !this.editingOrder.TechID ||
              this.editingOrder.TechID !== this.orderForm.TechID)) {
           this.orderForm.DateAssigned = new Date().toISOString();
         }
-        
+
         const orderData = {
           customerID: this.orderForm.CustomerID,
           techID: this.orderForm.TechID,
@@ -976,18 +962,18 @@ async saveEditedItem() {
           if (confirm('Are you sure you want to complete this order? Unused items will be returned to inventory.')) {
             try {
               const result = await api.completeOrder(orderID);
-              
+
               // Provide feedback to the user
               if (result.itemsReturned > 0) {
                 alert(`Order completed. ${result.itemsReturned} unused items were returned to inventory.`);
               } else {
                 alert('Order completed successfully.');
               }
-              
+
               // Refresh orders and inventory
               await this.loadOrders();
               await this.loadInventory();
-              
+
               // Close the order details modal if it's open
               if (this.showOrderDetailsModal && this.selectedOrder && this.selectedOrder.OrderID === orderID) {
                 this.closeOrderDetails();
@@ -1028,14 +1014,14 @@ async saveEditedItem() {
         CustomerID: '',
         SalesRepID: '',
         TechID: '',
-        Items: [] 
+        Items: []
       };
     },
 
 // Format date for display
     formatDate(dateString) {
       if (!dateString) return 'N/A';
-      
+
       const date = new Date(dateString);
       return new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
@@ -1046,7 +1032,7 @@ async saveEditedItem() {
       }).format(date);
     }
 
- 
+
   }
 }
 

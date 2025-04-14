@@ -23,7 +23,7 @@
         </button>
       </div>
 
-      
+
     <!--Inventory table-->
       <div class="data-table">
         <h2>Inventory</h2>
@@ -134,9 +134,9 @@
               {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
             </option>
           </select>
-          <button 
-            v-if="techFilter.selectedTechId" 
-            @click="techFilter.selectedTechId = ''" 
+          <button
+            v-if="techFilter.selectedTechId"
+            @click="techFilter.selectedTechId = ''"
             class="btn-clear-filter"
           >
             Clear Filter
@@ -146,7 +146,7 @@
 
       <!--Counter - MOVED INSIDE THE TECHNICIAN INVENTORY TAB -->
       <div v-if="techFilter.selectedTechId" class="filtered-results-count">
-        Showing {{ filteredTechnicianInventory.length }} items 
+        Showing {{ filteredTechnicianInventory.length }} items
       </div>
 
       <div class="data-table">
@@ -172,7 +172,7 @@
               <td>{{ techItem.TechID }}</td>
               <td>{{ techItem.ItemName }}</td>
               <td>{{ techItem.Item_Desc }}</td>
-              <td>{{ techItem.QTY }}</td> 
+              <td>{{ techItem.Item_Quantity }}</td>
               <td>
                 <button @click="editTechInventory(techItem)" class="btn-edit">
                   Edit
@@ -376,7 +376,7 @@ export default {
       showTechInventoryCreateForm: false,
       showInventoryCreateForm: false,
 
- 
+
       // Forms for Inventory Tab
       inventoryForm: {
         ItemName: '',
@@ -406,8 +406,8 @@ export default {
     if (!this.techFilter.selectedTechId) {
       return this.technicianInventory; // Return all if no filter selected
     }
-    
-    return this.technicianInventory.filter(item => 
+
+    return this.technicianInventory.filter(item =>
       item.TechID === this.techFilter.selectedTechId
     );
     },
@@ -475,7 +475,7 @@ export default {
       this.loading.inventory = true;
       this.error.inventory = null;
       try {
-        this.inventory = await api.getInventory(); 
+        this.inventory = await api.getInventory();
         console.log("Inventory loaded:", this.inventory.length, "items");
       } catch (error) {
         console.error('Error loading inventory:', error);
@@ -491,7 +491,7 @@ export default {
     },
     editInventory(item) {
       this.selectedInventory = null;
-      this.editingInventory = { ...item }; 
+      this.editingInventory = { ...item };
       this.inventoryForm = { ...item };
       this.showInventoryCreateForm = true;
     },
@@ -530,8 +530,8 @@ export default {
             body: JSON.stringify(postPayload)
           });
         }
-        await this.loadInventory(); 
-        this.cancelInventoryForm(); 
+        await this.loadInventory();
+        this.cancelInventoryForm();
       } catch (error) {
         console.error('Error saving inventory:', error);
         alert(`Error saving inventory: ${error?.message || error}`);
@@ -574,7 +574,7 @@ export default {
       this.loading.technicians = true;
       this.error.technicians = null;
       try {
-        this.technicians = await api.getTechnicians(); 
+        this.technicians = await api.getTechnicians();
         console.log("Technicians loaded:", this.technicians.length);
       } catch (error) {
         console.error('Error loading technicians:', error);
@@ -601,12 +601,12 @@ export default {
       if (this.techInventoryForm.SKU_Number !== this.editingTechInventory.SKU_Number ||
           this.techInventoryForm.TechID !== this.editingTechInventory.TechID) {
         // If primary keys (SKU or TechID) changed, we need to delete and recreate
-        
+
         // First, delete the old record
         await api.fetchData(`/techinventory/${this.editingTechInventory.SKU_Number}/${this.editingTechInventory.TechID}`, {
           method: 'DELETE'
         });
-        
+
         // Then create a new record
         await api.fetchData('/techinventory', {
           method: 'POST',
@@ -645,13 +645,13 @@ export default {
         })
       });
     }
-    
+
     // Reload both inventories to refresh quantities
     await Promise.all([
       this.loadTechnicianInventory(),
-      this.loadInventory()  
+      this.loadInventory()
     ]);
-    
+
     this.cancelTechInventoryForm();
   } catch (error) {
     console.error('Error saving technician inventory:', error);
@@ -665,7 +665,8 @@ export default {
           await api.fetchData(`/techinventory/${sku}/${techId}`, {
             method: 'DELETE'
           });
-          await this.loadTechnicianInventory();
+          await this.loadTechnicianInventory(),
+            this.loadInventory();
         } catch (error) {
           console.error('Error removing assignment:', error);
           alert(`Error removing assignment: ${error.message}`);
@@ -766,23 +767,23 @@ export default {
 
       this.processingBulkAssign = true;
       const techId = this.bulkAssignForm.technicianId;
-      
+
       // Debug - check what values are being sent
       console.log("Quantities before processing:", this.bulkAssignForm.quantities);
-      
+
       const itemsToAssign = this.bulkAssignForm.selectedItems.map(sku => {
-        // Ensure proper conversion to a valid number 
+        // Ensure proper conversion to a valid number
         let QTY = parseInt(this.bulkAssignForm.quantities[sku]);
-        
+
         // Log each conversion to debug - FIXED to use QTY
         console.log(`SKU ${sku}: original=${this.bulkAssignForm.quantities[sku]}, converted=${QTY}`);
-        
+
         // Force a minimum of 1 if not valid
         if (isNaN(QTY) || QTY < 1) {
           QTY = 1;
           console.log(`SKU ${sku}: using default quantity 1`);
         }
-        
+
         return {
           skuNumber: sku,
           techId: techId,
@@ -838,7 +839,7 @@ export default {
 
         await Promise.all([
           // Refresh Inventory
-          this.loadTechnicianInventory(), 
+          this.loadTechnicianInventory(),
           this.loadInventory()
       ]);
 
