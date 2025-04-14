@@ -139,7 +139,7 @@ router.delete('/inventory/:sku', authenticateUser, async (req, res) => {
 /**
  * GET /api/customers - Retrieve all customers
  */
-router.get('/customers', authenticateUser, async (req, res) => {
+router.get('/customer', authenticateUser, async (req, res) => {
     try {
         const { search } = req.query;
         let query = `
@@ -220,7 +220,7 @@ router.put('/customer/:id', authenticateUser, async (req, res) => {
 /**
  * POST /api/customers - Add a new customer
  */
-router.post('/customers', authenticateUser, async (req, res) => {
+router.post('/customer', authenticateUser, async (req, res) => {
     try {
         const { firstName, lastName, address, phone } = req.body;
 
@@ -244,7 +244,7 @@ router.post('/customers', authenticateUser, async (req, res) => {
 /**
  * DELETE /api/customers/:id - Soft delete a customer
  */
-router.delete('/customers/:id', authenticateUser, async (req, res) => {
+router.delete('/customer/:id', authenticateUser, async (req, res) => {
     try {
         const query = 'UPDATE Customer SET Deleted = "Yes" WHERE CustomerID = ?';
         const [result] = await pool.query(query, [req.params.id]);

@@ -281,15 +281,15 @@ async completeOrder(id) {
   
   // --------- CUSTOMERS ---------
   async getCustomers() {
-    return this.fetchData('/customers');
+    return this.fetchData('/customer');
   },
   
   async getCustomer(id) {
-    return this.fetchData(`/customers/${id}`);
+    return this.fetchData(`/customer/${id}`);
   },
   
   async createCustomer(customerData) {
-    return this.fetchData('/customers', {
+    return this.fetchData('/customer', {
       method: 'POST',
       body: JSON.stringify(customerData)
     });
@@ -303,7 +303,7 @@ async completeOrder(id) {
   },
   
   async deleteCustomer(id) {
-    return this.fetchData(`/customers/${id}`, {
+    return this.fetchData(`/customer/${id}`, {
       method: 'DELETE'
     });
   },
