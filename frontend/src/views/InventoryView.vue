@@ -124,7 +124,7 @@
         </button>
       </div>
 
-      <!-- Technician Filters - MOVED INSIDE THE TECHNICIAN INVENTORY TAB -->
+      <!-- Technician Filters  -->
       <div class="filter-section">
         <div class="form-group">
           <label for="tech-filter">Filter by Technician:</label>
@@ -144,7 +144,7 @@
         </div>
       </div>
 
-      <!--Counter - MOVED INSIDE THE TECHNICIAN INVENTORY TAB -->
+      <!--Counter -->
       <div v-if="techFilter.selectedTechId" class="filtered-results-count">
         Showing {{ filteredTechnicianInventory.length }} items 
       </div>
@@ -179,6 +179,9 @@
                 </button>
                 <button @click="deleteTechInventory(techItem.SKU_Number, techItem.TechID)" class="btn-delete">
                   Remove
+                </button>
+                <button @click="markItemAsUsedForOrder(techItem)" class="btn-used">
+                  Mark as Used
                 </button>
               </td>
             </tr>
@@ -323,8 +326,56 @@
             </div>
           </div>
       </div>
+
+      <!-- Mark as Used Modal -->
+      <div v-if="showMarkAsUsedModal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Mark Item as Used</h3>
+            <button @click="cancelMarkAsUsed" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p><strong>Item:</strong> {{ selectedItem?.ItemName }} (SKU: {{ selectedItem?.SKU_Number }})</p>
+            <p><strong>Available Quantity:</strong> {{ selectedItem?.QTY }}</p>
+            
+            <div class="form-group">
+              <label>Quantity to Use:</label>
+              <input 
+                type="number" 
+                v-model.number="markAsUsedForm.quantity" 
+                min="1" 
+                :max="selectedItem?.QTY || 1" 
+                required
+              />
+            </div>
+            
+            <div class="form-group">
+            <label>Select Order:</label>
+            <select v-model="markAsUsedForm.orderId" required>
+              <option value="">Select an order</option>
+              <option v-for="order in activeOrders" :key="order.OrderID" :value="order.OrderID">
+                Order #{{ order.OrderID }} - {{ formatDate(order.DateCreated) }}
+              </option>
+            </select>
+          </div>
+            
+            <div class="form-actions">
+              <button 
+                @click="confirmMarkAsUsed" 
+                class="btn-save" 
+                :disabled="!markAsUsedForm.orderId || markAsUsedForm.quantity < 1 || markAsUsedForm.quantity > (selectedItem?.QTY || 0)"
+              >
+                Confirm
+              </button>
+              <button @click="cancelMarkAsUsed" class="btn-cancel">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+</div>
 </template>
 
 <script>
@@ -364,6 +415,7 @@ export default {
         technicians: null
       },
 
+
       // Data
       inventory: [],
       technicianInventory: [],
@@ -387,10 +439,19 @@ export default {
         SKU_Number: '',
         TechID: '',
         QTY: 1
-      }
+      },
 
+      // Data for markasused
+      showMarkAsUsedModal: false,
+      selectedItem: null,
+      markAsUsedForm: {
+      quantity: 1,
+      orderId: ''
+    },
+    activeOrders: []
     };
   },
+
   computed: {
     connectionStatusClass() {
       if (!this.connectionStatus) return '';
@@ -401,6 +462,12 @@ export default {
        if (this.filteredInventoryItems.length === 0) return false;
        return this.filteredInventoryItems.every(item => this.bulkAssignForm.selectedItems.includes(item.SKU_Number));
     },
+
+    canSubmitUsedForm() {
+    return this.markAsUsedForm.orderId && 
+           this.markAsUsedForm.quantity > 0 && 
+           this.markAsUsedForm.quantity <= (this.selectedItem?.QTY || 0);
+  },
 
     filteredTechnicianInventory() {
     if (!this.techFilter.selectedTechId) {
@@ -443,6 +510,7 @@ export default {
     this.checkAdminStatus();
     this.loadData(); // Load all necessary data
   },
+
   methods: {
     // API connection check
     async checkApiConnection() {
@@ -484,6 +552,114 @@ export default {
         this.loading.inventory = false;
       }
     },
+
+    // Mark Items as Used
+    markItemAsUsedForOrder(item) {
+    this.selectedItem = item;
+    this.markAsUsedForm = {
+      quantity: 1,
+      orderId: ''
+    };
+    this.showMarkAsUsedModal = true;
+    
+    
+    // Load active orders if not already loaded
+    if (!this.activeOrders || this.activeOrders.length === 0) {
+      this.loadActiveOrders();
+    }
+  },
+
+  // Load active orders 
+  async loadActiveOrders() {
+    try {
+      this.loading.orders = true;
+      const orders = await api.getOrders();
+      // Filter for orders that are not completed
+      this.activeOrders = orders.filter(order => !order.DateCompleted);
+      this.loading.orders = false;
+    } catch (error) {
+      console.error('Error loading active orders:', error);
+      this.error.orders = `Failed to load orders: ${error.message}`;
+      this.loading.orders = false;
+    }
+  },
+
+    formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  },
+  
+
+  // Cancel the operation
+  cancelMarkAsUsed() {
+    this.showMarkAsUsedModal = false;
+    this.selectedItem = null;
+    this.markAsUsedForm = {
+      quantity: 1,
+      orderId: ''
+    };
+  },
+
+  // Confirm marking item as used
+  async confirmMarkAsUsed() {
+    if (!this.selectedItem || !this.markAsUsedForm.orderId || this.markAsUsedForm.quantity < 1) {
+      alert('Please complete all required fields');
+      return;
+    }
+    
+    try {
+      // 1. First add the item to the order
+      await api.fetchData('/orderitems', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skuNumber: this.selectedItem.SKU_Number,
+          orderID: this.markAsUsedForm.orderId,
+          QTY: this.markAsUsedForm.quantity,
+          dateAdded: new Date().toISOString(),
+          // Mark it as used immediately
+          dateUsed: new Date().toISOString()
+        })
+      });
+      
+      // 2. Now remove the item from technician inventory
+      // Use the existing PUT endpoint to adjust the quantity
+      if (this.markAsUsedForm.quantity < this.selectedItem.QTY) {
+        // Just reduce the quantity if not using all
+        await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            QTY: this.selectedItem.QTY - this.markAsUsedForm.quantity
+          })
+        });
+      } else {
+        // Remove completely if using all
+        await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
+          method: 'DELETE'
+        });
+      }
+      
+      // Show success message
+      alert(`Item successfully added to Order #${this.markAsUsedForm.orderId} and marked as used.`);
+      
+      // Refresh data
+      this.loadTechnicianInventory();
+      
+      // Close modal
+      this.cancelMarkAsUsed();
+    } catch (error) {
+      console.error('Error marking item as used:', error);
+      alert(`Error: ${error.message}`);
+    }
+  },
+
     viewInventoryDetails(item) {
       this.showInventoryCreateForm = false;
       this.editingInventory = null;
@@ -795,7 +971,7 @@ export default {
       console.log("Final items to assign:", itemsToAssign);
       console.log(`Starting bulk assignment of ${itemsToAssign.length} items to technician ${techId}`);
 
-  // Validate quantities before sending - FIXED to use QTY
+  // Validate quantities before sending
       let validationPassed = true;
       const inventoryMap = new Map(this.inventory.map(item => [item.SKU_Number, item.Item_Quantity]));
 
@@ -1086,6 +1262,29 @@ export default {
   font-size: 0.9rem;
   margin-top: 0.5rem;
   color: #555;
+}
+
+.btn-used {
+  background-color: #ff9800; /* Orange color */
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-right: 5px;
+  font-size: 0.9em;
+}
+
+.btn-used:hover {
+  background-color: #f57c00; /* Darker orange on hover */
+}
+
+/* You might also want to add a style for the disabled state */
+.btn-used:disabled {
+  background-color: #ffcc80; /* Light orange when disabled */
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 </style>
