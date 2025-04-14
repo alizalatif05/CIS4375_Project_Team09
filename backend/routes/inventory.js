@@ -7,7 +7,7 @@ const router = express.Router();
 
 /**************************************
  *  INVENTORY ROUTES
- **************************************/
+ **************************************
 
 /**
  * GET /api/inventory - Retrieve all inventory items
@@ -165,7 +165,7 @@ router.get('/customers', authenticateUser, async (req, res) => {
 });
 
 /**
- * PUT /api/customer/:id - Update an existing customer record (supports partial updates)
+ * PUT /api/customer/:id - Update an existing customer record 
  */
 router.put('/customer/:id', authenticateUser, async (req, res) => {
     try {
