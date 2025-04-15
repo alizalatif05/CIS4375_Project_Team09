@@ -1,5 +1,5 @@
-// Updated api.js with fixed endpoints
-// Replace your current api.js content with this
+// Enpoints
+
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -10,7 +10,7 @@ export default {
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   },
 
-  // Basic fetch wrapper with error handling
+  // Basic fetch with error handling
   async fetchData(endpoint, options = {}) {
     const url = `${API_URL}${endpoint}`;
 
@@ -54,9 +54,8 @@ export default {
 
   // --------- USERS ---------
   async getUsers() {
-    // Try both endpoints since there's a discrepancy
     try {
-      return await this.fetchData('/user'); // Use singular endpoint as in your backend route
+      return await this.fetchData('/user'); 
     } catch (error) {
       console.log('Trying plural endpoint...');
       return await this.fetchData('/users');
@@ -64,25 +63,25 @@ export default {
   },
 
   async getUser(id) {
-    return this.fetchData(`/user/${id}`); // Changed to match your backend route
+    return this.fetchData(`/user/${id}`); 
   },
 
   async createUser(userData) {
-    return this.fetchData('/user', { // Changed to match your backend route
+    return this.fetchData('/user', { 
       method: 'POST',
       body: JSON.stringify(userData)
     });
   },
 
   async updateUser(id, userData) {
-    return this.fetchData(`/users/${id}`, { // This one uses plural in your backend
+    return this.fetchData(`/users/${id}`, { 
       method: 'PUT',
       body: JSON.stringify(userData)
     });
   },
 
   async deleteUser(id) {
-    return this.fetchData(`/users/${id}`, { // This one uses plural in your backend
+    return this.fetchData(`/users/${id}`, { 
       method: 'DELETE'
     });
   },
@@ -296,7 +295,7 @@ async completeOrder(id) {
   },
   
   async updateCustomer(id, customerData) {
-    return this.fetchData(`/customer/${id}`, { // Note: Your backend uses singular 'customer' here
+    return this.fetchData(`/customer/${id}`, { 
       method: 'PUT',
       body: JSON.stringify(customerData)
     });

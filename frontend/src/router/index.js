@@ -7,7 +7,7 @@ import AdminView from '@/views/AdminOperarations.vue';
 import LoginView from '../views/LoginView.vue';
 
 const routes = [
-  { path: '/', redirect: '/login' }, // Redirect base URL to login
+  { path: '/', redirect: '/login' }, 
   { path: '/home', name: 'home', component: HomeView, meta: {requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryView, meta: {requiresAuth: true} },
   { path: '/customers', name: 'customers', component: CustomersView, meta: {requiresAuth: true}  },
@@ -25,7 +25,7 @@ const router = createRouter({
   routes,
 });
 
-// Navigation Guard, guard other pages until logged in 
+// Navigation Guard to wait for auth
 router.beforeEach((to, from, next) => {
   const publicPages = ['/login'];
   const authRequired = !publicPages.includes(to.path);

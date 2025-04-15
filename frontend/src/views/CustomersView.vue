@@ -12,6 +12,7 @@
       </button>
     </div>
 
+    <!--Customers Table-->
     <div class="data-table">
       <h2>Customers</h2>
       <div v-if="loading.customers" class="loading">Loading customers...</div>
@@ -202,7 +203,7 @@ export default {
     editCustomer(customer) {
       this.editingCustomer = customer;
       this.customerForm = {
-        Customer_fName: customer.firstName,  // Maps from API response to form field
+        Customer_fName: customer.firstName,  
         Customer_lName: customer.lastName,
         CustomerAddress: customer.address,
         CustomerPhone: customer.phone
