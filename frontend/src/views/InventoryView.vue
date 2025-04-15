@@ -606,59 +606,68 @@ export default {
     };
   },
 
-  // Confirm marking item as used
-  async confirmMarkAsUsed() {
-    if (!this.selectedItem || !this.markAsUsedForm.orderId || this.markAsUsedForm.quantity < 1) {
-      alert('Please complete all required fields');
-      return;
-    }
+    // Confirm marking item as used
+    async confirmMarkAsUsed() {
+  if (!this.selectedItem || !this.markAsUsedForm.orderId || this.markAsUsedForm.quantity < 1) {
+    alert('Please complete all required fields');
+    return;
+  }
+  
+  try {
+    // Format date for MySQL - define function inline
+    const formatDateForMySQL = (date) => {
+      const d = new Date(date);
+      return d.toISOString().slice(0, 19).replace('T', ' ');
+    };
     
-    try {
-      // 1. First add the item to the order
-      await api.fetchData('/orderitems', {
-        method: 'POST',
+    // Format current date for both values
+    const now = new Date();
+    const formattedDate = formatDateForMySQL(now);
+    
+    // 1. First add the item to the order
+    await api.fetchData('/orderitems', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        skuNumber: this.selectedItem.SKU_Number,
+        orderID: this.markAsUsedForm.orderId,
+        QTY: this.markAsUsedForm.quantity,
+        dateAdded: formattedDate,  // Use formatted date
+        dateUsed: formattedDate    // Use formatted date
+      })
+    });
+  // 2. Now remove the item from technician inventory
+    // Use the existing PUT endpoint to adjust the quantity
+    if (this.markAsUsedForm.quantity < this.selectedItem.QTY) {
+      // Just reduce the quantity if not using all
+      await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          skuNumber: this.selectedItem.SKU_Number,
-          orderID: this.markAsUsedForm.orderId,
-          QTY: this.markAsUsedForm.quantity,
-          dateAdded: new Date().toISOString(),
-          // Mark it as used immediately
-          dateUsed: new Date().toISOString()
+          QTY: this.selectedItem.QTY - this.markAsUsedForm.quantity
         })
       });
-      
-      // 2. Now remove the item from technician inventory
-      // Use the existing PUT endpoint to adjust the quantity
-      if (this.markAsUsedForm.quantity < this.selectedItem.QTY) {
-        // Just reduce the quantity if not using all
-        await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            QTY: this.selectedItem.QTY - this.markAsUsedForm.quantity
-          })
-        });
-      } else {
-        // Remove completely if using all
-        await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
-          method: 'DELETE'
-        });
-      }
-      
-      // Show success message
-      alert(`Item successfully added to Order #${this.markAsUsedForm.orderId} and marked as used.`);
-      
-      // Refresh data
-      this.loadTechnicianInventory();
-      
-      // Close modal
-      this.cancelMarkAsUsed();
-    } catch (error) {
-      console.error('Error marking item as used:', error);
-      alert(`Error: ${error.message}`);
+    } else {
+      // Remove completely if using all
+      await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
+        method: 'DELETE'
+      });
     }
-  },
+    
+    // Show success message
+    alert(`Item successfully added to Order #${this.markAsUsedForm.orderId} and marked as used.`);
+    
+    // Refresh data
+    this.loadTechnicianInventory();
+    
+    // Close modal
+    this.cancelMarkAsUsed();
+  } catch (error) {
+    console.error('Error marking item as used:', error);
+    alert(`Error: ${error.message}`);
+  }
+},
+
 
     viewInventoryDetails(item) {
       this.showInventoryCreateForm = false;
