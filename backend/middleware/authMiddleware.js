@@ -21,10 +21,10 @@ const authenticateUser = async (req, res, next) => {
         const decoded = jwt.verify(
             actualToken, 
             process.env.JWT_SECRET || 'supersecretkey',
-            { algorithms: ['HS256'] } // Explicitly specify algorithm for added security
+            { algorithms: ['HS256'] } 
         );
         
-        // Look up the user in the database to confirm they exist and get current status
+        // Look up the user in the database 
         const [users] = await pool.query(
             'SELECT UserID, Username, UserType, Deleted FROM user WHERE UserID = ?', 
             [decoded.userId]
