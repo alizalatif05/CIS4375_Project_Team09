@@ -65,7 +65,6 @@ export default {
   methods: {
     checkAuthStatus() {
       const token = localStorage.getItem('token');
-      // You might want to add additional token validation here
       this.isAuthenticated = !!token;
       
       // Also check and set admin status
@@ -81,12 +80,12 @@ export default {
     }
   },
   mounted() {
-    // Add event listeners for both storage and custom auth-changed event
+    // Event listeners for storage and auth
     window.addEventListener('storage', this.checkAuthStatus);
     window.addEventListener('auth-changed', this.checkAuthStatus);
   },
   beforeUnmount() {
-    // Remove both event listeners to prevent memory leaks
+    // Remove listeners
     window.removeEventListener('storage', this.checkAuthStatus);
     window.removeEventListener('auth-changed', this.checkAuthStatus);
   }

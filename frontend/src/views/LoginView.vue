@@ -1,4 +1,6 @@
 <template>
+
+  <!--Login-->
   <div class="login-container">
     <div class="login-box">
       <h2 class="text-2xl font-bold mb-4">
@@ -118,7 +120,7 @@ export default {
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('isAdmin', true);
             
-            // Trigger a custom event to update authentication state
+            // update authentication state
             window.dispatchEvent(new Event('auth-changed'));
             
             // Redirect to admin dashboard
@@ -171,7 +173,7 @@ export default {
     }
   },
   mounted() {
-    // Clear any existing tokens on component mount
+    // Clear any existing tokens 
     localStorage.removeItem('token');
     localStorage.removeItem('isAdmin');
     

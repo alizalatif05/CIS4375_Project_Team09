@@ -246,7 +246,7 @@
           <td>{{ user.Username }}</td>
           <td>{{ user.UserType }}</td>
           <td>
-            <!-- Replace static badge with toggleable switch -->
+            <!-- toggleable switch -->
             <div class="status-toggle">
               <label class="switch">
                 <input 
@@ -502,7 +502,7 @@ async toggleUserStatus(user) {
     
     await api.updateUser(user.UserID, updatedUser);
     
-    // Update the local user object to reflect the change
+    // Update the local user 
     user.Deleted = updatedUser.Deleted;
     
     // Show success message

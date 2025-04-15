@@ -379,8 +379,8 @@
 </template>
 
 <script>
-import "@/assets/css/style.css"; // Adjust path as needed
-import api from '../../services/api.js'; // Adjust path as needed
+import "@/assets/css/style.css"; 
+import api from '../../services/api.js'; 
 
 export default {
   data() {
@@ -403,7 +403,7 @@ export default {
 
       processingBulkAssign: false,
 
-      // Loading and error states
+      // Loading and error 
       loading: {
         inventory: false,
         technicianInventory: false,
@@ -500,7 +500,7 @@ export default {
       immediate: true
     },
      itemSearchQuery() {
-         // Refilter when search query changes
+         // Refilter when search changes
          this.filterInventoryItems();
     }
   },
@@ -569,51 +569,61 @@ export default {
     }
   },
 
-  // Load active orders 
-  async loadActiveOrders() {
-    try {
-      this.loading.orders = true;
-      const orders = await api.getOrders();
-      // Filter for orders that are not completed
-      this.activeOrders = orders.filter(order => !order.DateCompleted);
-      this.loading.orders = false;
-    } catch (error) {
-      console.error('Error loading active orders:', error);
-      this.error.orders = `Failed to load orders: ${error.message}`;
-      this.loading.orders = false;
-    }
-  },
+    // Load active orders 
+    async loadActiveOrders() {
+      try {
+        this.loading.orders = true;
+        const orders = await api.getOrders();
+        // Filter for orders that are not completed
+        this.activeOrders = orders.filter(order => !order.DateCompleted);
+        this.loading.orders = false;
+      } catch (error) {
+        console.error('Error loading active orders:', error);
+        this.error.orders = `Failed to load orders: ${error.message}`;
+        this.loading.orders = false;
+      }
+    },
 
-    formatDate(dateString) {
-    if (!dateString) return 'N/A';
+      formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }).format(date);
+    },
     
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    }).format(date);
-  },
-  
 
-  // Cancel the operation
-  cancelMarkAsUsed() {
-    this.showMarkAsUsedModal = false;
-    this.selectedItem = null;
-    this.markAsUsedForm = {
-      quantity: 1,
-      orderId: ''
-    };
-  },
+    // Cancel the operation
+    cancelMarkAsUsed() {
+      this.showMarkAsUsedModal = false;
+      this.selectedItem = null;
+      this.markAsUsedForm = {
+        quantity: 1,
+        orderId: ''
+      };
+    },
 
-  // Confirm marking item as used
-  async confirmMarkAsUsed() {
+      // Confirm marking item as used
+      async confirmMarkAsUsed() {
     if (!this.selectedItem || !this.markAsUsedForm.orderId || this.markAsUsedForm.quantity < 1) {
       alert('Please complete all required fields');
       return;
     }
     
     try {
+      // Format date for MySQL - define function inline
+      const formatDateForMySQL = (date) => {
+        const d = new Date(date);
+        return d.toISOString().slice(0, 19).replace('T', ' ');
+      };
+      
+      // Format current date for both values
+      const now = new Date();
+      const formattedDate = formatDateForMySQL(now);
+      
       // 1. First add the item to the order
       await api.fetchData('/orderitems', {
         method: 'POST',
@@ -622,16 +632,13 @@ export default {
           skuNumber: this.selectedItem.SKU_Number,
           orderID: this.markAsUsedForm.orderId,
           QTY: this.markAsUsedForm.quantity,
-          dateAdded: new Date().toISOString(),
-          // Mark it as used immediately
-          dateUsed: new Date().toISOString()
+          dateAdded: formattedDate,  // Use formatted date
+          dateUsed: formattedDate    // Use formatted date
         })
       });
-      
-      // 2. Now remove the item from technician inventory
-      // Use the existing PUT endpoint to adjust the quantity
+    // remove the item from technician inventory
       if (this.markAsUsedForm.quantity < this.selectedItem.QTY) {
-        // Just reduce the quantity if not using all
+        // reduce the quantity if not using all
         await api.fetchData(`/techinventory/${this.selectedItem.SKU_Number}/${this.selectedItem.TechID}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -660,6 +667,7 @@ export default {
     }
   },
 
+
     viewInventoryDetails(item) {
       this.showInventoryCreateForm = false;
       this.editingInventory = null;
@@ -673,7 +681,7 @@ export default {
     },
     editFromDetails(item) {
       this.selectedInventory = null;
-      // Use nextTick or setTimeout to ensure modal closes before opening edit form
+      // Use nextTick or setTimeout - ensures modal closes
        this.$nextTick(() => {
             this.editingInventory = { ...item };
             this.inventoryForm = { ...item };
@@ -776,7 +784,7 @@ export default {
       // Check if SKU changed
       if (this.techInventoryForm.SKU_Number !== this.editingTechInventory.SKU_Number ||
           this.techInventoryForm.TechID !== this.editingTechInventory.TechID) {
-        // If primary keys (SKU or TechID) changed, we need to delete and recreate
+        // If primary keys (SKU or TechID) changed, delete and recreate
         
         // First, delete the old record
         await api.fetchData(`/techinventory/${this.editingTechInventory.SKU_Number}/${this.editingTechInventory.TechID}`, {
@@ -897,7 +905,7 @@ export default {
          }
          console.log("Filtered inventory items:", this.filteredInventoryItems.length);
 
-          // Clean up quantities map: remove entries for items not currently selected
+          // remove entries for items not currently selected
           const currentSelection = new Set(this.bulkAssignForm.selectedItems);
           Object.keys(this.bulkAssignForm.quantities).forEach(sku => {
               if (!currentSelection.has(sku)) {
@@ -988,7 +996,7 @@ export default {
         return; // Stop if validation fails
       }
 
-       // Use Promise.allSettled to handle individual errors gracefully
+       // Use Promise.allSettled to handle individual errors
       try {
         const results = await Promise.allSettled(itemsToAssign.map(item =>
           api.fetchData('/techinventory', { // Ensure this endpoint handles quantity
@@ -1006,8 +1014,6 @@ export default {
           message += `\n${failures.length} items failed:`;
           failures.forEach(fail => {
              // Attempt to get SKU from original item data if possible, otherwise log the reason
-             // This requires finding the original item payload based on the rejected promise index or similar strategy
-             // For simplicity here, just logging the reason:
              console.error("Assignment Error:", fail.reason);
              message += `\n - ${fail.reason?.message || 'Unknown error'}`;
           });
@@ -1023,7 +1029,7 @@ export default {
       this.cancelBulkAssignForm(); // Close and reset the form
 
       } catch (error) {
-        // Catch errors not related to individual API calls (e.g., network error before sending)
+        // Catch errors not related to individual API calls 
         console.error('Error during bulk assignment process:', error);
         alert(`A general error occurred during bulk assignment: ${error.message}`);
       } finally {
@@ -1053,20 +1059,17 @@ export default {
 </script>
 
 <style scoped>
-/* Styles remain UNCHANGED from your original code */
-/* Add some z-index handling for modals */
 .modal {
   z-index: 1000;
 }
 
-/* Add transitions for smoother modal handling */
 .modal-content {
   transition: all 0.3s ease;
 }
-/* New styles for bulk assignment */
+/* styles for bulk assignment */
 .bulk-assign-btn {
   margin-left: 1rem;
-  background-color: #2c3e50; /* Darker button for distinction */
+  background-color: #2c3e50; 
   color: white;
 }
 .bulk-assign-btn:hover {
@@ -1074,7 +1077,7 @@ export default {
 }
 
 .inventory-items-list {
-  max-height: 300px; /* Adjust as needed */
+  max-height: 300px; 
   overflow-y: auto;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -1086,11 +1089,11 @@ export default {
 .search-box {
   margin-bottom: 0.75rem;
   position: sticky; /* Keep search bar visible */
-  top: -8px; /* Adjust based on padding */
-  background-color: #fdfdfd; /* Match list background */
+  top: -8px; 
+  background-color: #fdfdfd; 
   padding-top: 8px;
   padding-bottom: 4px;
-  z-index: 10; /* Ensure it stays above list items */
+  z-index: 10; 
 }
 
 .search-box input {
@@ -1098,7 +1101,7 @@ export default {
   padding: 0.6rem;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-sizing: border-box; /* Include padding in width */
+  box-sizing: border-box; 
 }
 
 .select-all {
@@ -1114,7 +1117,6 @@ export default {
 }
 
 .items-container {
-  /* Using flexbox for potentially better wrapping control */
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -1123,12 +1125,12 @@ export default {
 .item-checkbox {
   padding: 0.3rem 0.5rem;
   border-radius: 3px;
-  border: 1px solid transparent; /* Placeholder for hover */
-  flex-basis: calc(50% - 0.25rem); /* Adjust for 2 columns, minus half gap */
+  border: 1px solid transparent; 
+  flex-basis: calc(50% - 0.25rem); 
   box-sizing: border-box;
 }
 .item-checkbox label {
-    display: block; /* Ensure label takes full width */
+    display: block; 
     cursor: pointer;
 }
 
@@ -1146,12 +1148,11 @@ export default {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .items-container {
-     /* Switch to single column on smaller screens */
      flex-direction: column;
      gap: 0.25rem;
   }
    .item-checkbox {
-       flex-basis: 100%; /* Full width */
+       flex-basis: 100%; 
    }
 }
 
@@ -1160,14 +1161,14 @@ export default {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  gap: 1rem; /* Add space between text/checkbox and quantity */
+  gap: 1rem; 
 }
 .item-row span { /* Container for checkbox and text */
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-grow: 1; /* Allow text to take available space */
-    word-break: break-word; /* Prevent long names from overflowing badly */
+    flex-grow: 1; 
+    word-break: break-word; /* Prevent overflowing badly */
 }
 
 
@@ -1175,7 +1176,6 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* flex-shrink: 0; Prevent quantity input from shrinking */
 }
 
 .quantity-input input[type="number"] {
@@ -1186,14 +1186,14 @@ export default {
   text-align: right;
   box-sizing: border-box;
 }
-/* Hide spinner buttons on number input for cleaner look */
+
 .quantity-input input[type=number]::-webkit-outer-spin-button,
 .quantity-input input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 .quantity-input input[type=number] {
-  -moz-appearance: textfield; /* Firefox */
+  -moz-appearance: textfield; 
 }
 
 
@@ -1257,7 +1257,7 @@ export default {
   background-color: #e0e0e0;
 }
 
-/* Add a subtle highlight for filtered results */
+
 .filtered-results-count {
   font-size: 0.9rem;
   margin-top: 0.5rem;
@@ -1265,7 +1265,7 @@ export default {
 }
 
 .btn-used {
-  background-color: #ff9800; /* Orange color */
+  background-color: #ff9800; 
   color: white;
   border: none;
   padding: 8px 15px;
@@ -1277,12 +1277,11 @@ export default {
 }
 
 .btn-used:hover {
-  background-color: #f57c00; /* Darker orange on hover */
+  background-color: #f57c00; 
 }
 
-/* You might also want to add a style for the disabled state */
 .btn-used:disabled {
-  background-color: #ffcc80; /* Light orange when disabled */
+  background-color: #ffcc80; 
   cursor: not-allowed;
   opacity: 0.7;
 }

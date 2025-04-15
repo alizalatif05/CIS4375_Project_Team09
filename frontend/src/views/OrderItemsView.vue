@@ -6,7 +6,7 @@
       <span :class="connectionStatusClass">{{ connectionStatusMessage }}</span>
     </div>
 
-<!--Order Filters-->
+    <!-- Order creation button -->
     <div class="actions">
       <button @click="showOrderCreateForm = true" class="create-btn">
         Add New Order
@@ -38,7 +38,7 @@
   </div>
 </div>
 
-    <!--Initial Table-->
+    <!-- Main orders table -->
     <div class="data-table">
       <h2>Orders</h2>
       <div v-if="loading.orders" class="loading">Loading orders...</div>
@@ -82,7 +82,7 @@
         </table>
       </div>
 
-      <!-- Add this new modal for order details -->
+      <!-- Order details modal -->
       <div v-if="showOrderDetailsModal" class="modal">
         <div class="modal-content order-details-modal">
           <div class="modal-header">
@@ -156,7 +156,7 @@
         </div>
       </div>
 
-      <!--Edit Order-->
+      <!-- Order create/edit modal -->
     <div v-if="showOrderCreateForm || editingOrder" class="modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -201,6 +201,7 @@
       </div>
     </div>
 
+    <!-- Add items modal -->
     <div v-if="showAddItemsModal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -236,7 +237,7 @@
               Add to List
             </button>
           </div>
-
+          <!-- Selected items list -->
           <div class="selected-items-list" v-if="selectedItems.length > 0">
             <h4>Items to Add:</h4>
             <table class="items-table">
@@ -273,6 +274,7 @@
       </div>
     </div>
 
+    <!-- Edit item modal -->
     <div v-if="showEditItemModal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -320,18 +322,18 @@ import api from '../../services/api.js';
 export default {
   data() {
     return {
-      // State for the edit item form
+      // Edit item form data
       editItemForm: {
         OrderID: null,
         SKU_Number: null,
         QTY: 1,
-        originalSKU: null // Store the original SKU in case it's changed
+        originalSKU: null
       },
 
-      // API connection status ('connected', 'error', or null)
+      // API connection status
       connectionStatus: null,
 
-      // Loading indicators for different data types
+      // Loading and error states
       loading: {
         orders: false,
         orderItems: false,
@@ -340,7 +342,6 @@ export default {
         technicians: false,
         inventory: false
       },
-      // Error messages for different data types
       error: {
         orders: null,
         orderItems: null,
@@ -350,60 +351,61 @@ export default {
         inventory: null
       },
 
-      // Data arrays populated from the API
+      // Data arrays
       orders: [],
-      orderItems: [], // Items for the currently expanded order
+      orderItems: [],
       customers: [],
       salesReps: [],
       technicians: [],
-      inventory: [], // Available inventory items
+      inventory: [],
 
-      // State for the 'Add Items' modal form
+      // Add items modal state
       itemToAdd: {
         SKU_Number: '',
         QTY: 1,
-        DateAdded: null, // Added timestamp field
-        DateUsed: null   // Added timestamp field
+        DateAdded: null, 
+        DateUsed: null   
       },
-      selectedItems: [], // List of items staged to be added to an order
+      selectedItems: [], 
 
-      // UI State properties
-      showAddItemsModal: false,  // Controls visibility of the add items modal
-      showEditItemModal: false,  // Controls visibility of the edit item modal
-      showOrderCreateForm: false,// Controls visibility of the create/edit order modal
-      expandedOrder: null,       // OrderID of the currently expanded order, or null
-      selectedOrder: null,       // The order object currently selected for actions (e.g., adding items)
-      editingOrder: null,        // The order object being edited, or null if creating
+      // UI state
+      showAddItemsModal: false,  
+      showEditItemModal: false,  
+      showOrderCreateForm: false,
+      expandedOrder: null,       
+      selectedOrder: null,       
+      editingOrder: null,        
       
-      // Form data for creating/editing an order
+      // Order form data
        orderForm: {
         CustomerID: '',
         SalesRepID: '',
         TechID: '',
-        DateCreated: null,  // Added timestamp field
-        DateAssigned: null, // Added timestamp field
-        DateCompleted: null, // Added timestamp field
+        DateCreated: null,  
+        DateAssigned: null, 
+        DateCompleted: null, 
         Items: []
       },
 
       showOrderDetailsModal: false,
 
-       // Date filtering options
+      // Date filtering options
        dateFilters: {
         startDate: null,
         endDate: null,
-        filterBy: 'created', // Options: 'created', 'assigned', 'completed'
+        filterBy: 'created',
       }
     };
   },
 
   computed: {
-    // Determines the CSS class for the connection status indicator
+    // Connection status styling
     connectionStatusClass() {
       if (!this.connectionStatus) return '';
       return this.connectionStatus === 'connected' ? 'status-connected' : 'status-error';
     },
-    // Determines the message displayed in the connection status indicator
+    
+    // Connection status message
     connectionStatusMessage() {
       switch (this.connectionStatus) {
         case 'connected':
@@ -414,22 +416,22 @@ export default {
           return '';
       }
     },
-    // Provides the list of available inventory items (assumes backend provides filtered list if needed)
+    
+    // Available inventory items
     availableItems() {
       return this.inventory;
     },
 
+    // Orders filtered by date
     filteredOrders() {
       if (!this.dateFilters.startDate && !this.dateFilters.endDate) {
-        return this.orders; // Return all orders if no date filters applied
+        return this.orders;
       }
       
-      // Convert string dates to Date objects for comparison
       const startDate = this.dateFilters.startDate ? new Date(this.dateFilters.startDate) : null;
       const endDate = this.dateFilters.endDate ? new Date(this.dateFilters.endDate) : null;
       
       return this.orders.filter(order => {
-        // Determine which date field to filter on
         let orderDate;
         
         switch(this.dateFilters.filterBy) {
@@ -437,30 +439,27 @@ export default {
             orderDate = new Date(order.DateCreated);
             break;
           case 'assigned':
-            if (!order.DateAssigned) return false; // Skip orders without assignment date
+            if (!order.DateAssigned) return false;
             orderDate = new Date(order.DateAssigned);
             break;
           case 'completed':
-            if (!order.DateCompleted) return false; // Skip incomplete orders
+            if (!order.DateCompleted) return false;
             orderDate = new Date(order.DateCompleted);
             break;
           default:
             orderDate = new Date(order.DateCreated);
         }
         
-        // Apply date range filtering
         let matchesStart = true;
         let matchesEnd = true;
         
         if (startDate) {
-          // Set hours to 0 for start date comparison (beginning of day)
           const adjustedStartDate = new Date(startDate);
           adjustedStartDate.setHours(0, 0, 0, 0);
           matchesStart = orderDate >= adjustedStartDate;
         }
         
         if (endDate) {
-          // Set hours to 23:59:59 for end date comparison (end of day)
           const adjustedEndDate = new Date(endDate);
           adjustedEndDate.setHours(23, 59, 59, 999);
           matchesEnd = orderDate <= adjustedEndDate;
@@ -472,19 +471,17 @@ export default {
   },
 
   created() {
-    // Initial actions when the component is created
     this.checkApiConnection();
     this.loadData();
   },
 
   methods: {
-    // Checks the connection status with the backend API and provides user feedback.
+    // Check if backend API is available
     async checkApiConnection() {
       try {
         const result = await api.testConnection();
         this.connectionStatus = result.status === 'ok' ? 'connected' : 'error';
 
-        // Auto-hide success message after 3 seconds
         if (this.connectionStatus === 'connected') {
           setTimeout(() => {
             this.connectionStatus = null;
@@ -496,44 +493,38 @@ export default {
       }
     },
 
-        // editOrder method - Sets up the form for editing an existing order
+    // Set up form for editing an order
     editOrder(order) {
-      // Store the order being edited
       this.editingOrder = order;
       
-      // Populate the form with the order's current data
       this.orderForm = {
         CustomerID: order.CustomerID,
         SalesRepID: order.SalesRepID,
         TechID: order.TechID,
-        Items: [] // Items are handled separately
+        Items: []
       };
       
-      // Display the edit form modal
       this.showOrderCreateForm = true;
     },
 
-    // Calculates the maximum quantity allowed for an item being edited, based on available inventory.
+    // Get max available quantity for edit item form
     getMaxQuantityForEdit() {
       if (!this.editItemForm.SKU_Number) return 1;
       const item = this.inventory.find(item => item.SKU_Number === this.editItemForm.SKU_Number);
-      // Consider current quantity + available stock? Or just available stock? Assuming available stock for now.
-      // If editing, it should probably be current quantity + remaining stock. Needs clarification based on backend logic.
-      // For simplicity, returning available quantity from inventory.
       return item ? item.Item_Quantity : 1; 
     },
 
-    // Orchestrates loading of all necessary data for the component.
+    // Load all necessary data
     async loadData() {
       await this.loadCustomers();
       await this.loadSalesReps();
       await this.loadTechnicians();
-      await this.loadInventory(); // Load inventory first so item names are available
-      await this.loadOrders();     // Load orders last
+      await this.loadInventory();
+      await this.loadOrders();
       await this.loadOrderItems();
     },
 
-    // Fetches the list of orders from the API.
+    // Load orders from API
     async loadOrders() {
       this.loading.orders = true;
       this.error.orders = null;
@@ -547,19 +538,15 @@ export default {
       }
     },
 
-    // Fetches the detailed items (including quantity) for a specific order from the API. ERROR HERE
-
- // Fetches the detailed items for a specific order from the API.
+    // Load items for a specific order
     async loadOrderItems(orderID) {
-      if (!orderID) return; // Don't proceed if no order ID is provided
+      if (!orderID) return;
       
       this.loading.orderItems = true;
       this.error.orderItems = null;
       try {
-        // Use the dedicated endpoint for order items
         const orderItems = await api.fetchData(`/orders/${orderID}/items`);
         
-        // Since we're now using the correct endpoint, we expect an array response
         if (Array.isArray(orderItems)) {
           this.orderItems = orderItems;
         } else {
@@ -570,13 +557,13 @@ export default {
       } catch (error) {
         console.error('Error loading order items:', error);
         this.error.orderItems = `Failed to load order items: ${error.message}`;
-        this.orderItems = []; // Clear items on error
+        this.orderItems = [];
       } finally {
         this.loading.orderItems = false;
       }
     },
 
-    // Fetches the list of customers from the API.
+    // Load customer data
     async loadCustomers() {
       this.loading.customers = true;
       this.error.customers = null;
@@ -590,7 +577,7 @@ export default {
       }
     },
 
-    // Fetches the list of sales representatives from the API.
+    // Load sales rep data
     async loadSalesReps() {
       this.loading.salesReps = true;
       this.error.salesReps = null;
@@ -604,7 +591,7 @@ export default {
       }
     },
 
-    // Fetches the list of technicians from the API.
+    // Load technician data
     async loadTechnicians() {
       this.loading.technicians = true;
       this.error.technicians = null;
@@ -618,7 +605,7 @@ export default {
       }
     },
 
-    // Fetches the list of inventory items from the API.
+    // Load inventory data
     async loadInventory() {
       this.loading.inventory = true;
       this.error.inventory = null;
@@ -630,24 +617,22 @@ export default {
         } else {
           console.error('Unexpected inventory response format:', response);
           this.error.inventory = 'Unexpected data format received from server';
-          this.inventory = []; // Ensure inventory is an array
+          this.inventory = [];
         }
       } catch (error) {
         console.error('Error loading inventory:', error);
         this.error.inventory = `Failed to load inventory: ${error.message}`;
-        this.inventory = []; // Ensure inventory is an array
+        this.inventory = [];
       } finally {
         this.loading.inventory = false;
       }
     },
 
-    // Deletes a specific item from an order via API call after confirmation.
+    // Delete an item from an order
     async deleteOrderItem(item) {
       if (confirm(`Are you sure you want to remove ${item.ItemName} (SKU: ${item.SKU_Number}) from this order?`)) {
         try {
-          // Assuming api.deleteOrderItem takes orderID and skuNumber
           await api.deleteOrderItem(this.expandedOrder, item.SKU_Number); 
-          // Refresh the order items list for the currently expanded order
           await this.loadOrderItems(this.expandedOrder);
         } catch (error) {
           console.error('Error deleting order item:', error);
@@ -656,69 +641,68 @@ export default {
       }
     },
 
-    // Helper method: Finds and returns the customer's full name based on ID.
+    // Get customer name from ID
     getCustomerName(customerID) {
       const customer = this.customers.find(c => c.CustomerID === customerID);
       return customer ? `${customer.firstName} ${customer.lastName}` : 'Unknown';
     },
 
-    // Helper method: Finds and returns the sales rep's full name based on ID.
+    // Get sales rep name from ID
     getSalesRepName(salesRepID) {
       const salesRep = this.salesReps.find(s => s.SalesRepID === salesRepID);
       return salesRep ? `${salesRep.SalesRep_fName} ${salesRep.SalesRep_lName}` : 'Unknown';
     },
 
-    // Helper method: Finds and returns the technician's full name based on ID.
+    // Get technician name from ID
     getTechnicianName(techID) {
       const technician = this.technicians.find(t => t.TechID === techID);
       return technician ? `${technician.firstName} ${technician.lastName}` : 'Unknown';
     },
     
-    // Helper method: Finds and returns the item's name based on SKU number.
+    // Get item name from SKU
     getItemName(skuNumber) {
       const item = this.inventory.find(item => item.SKU_Number === skuNumber);
       return item ? item.ItemName : 'Unknown Item';
     },
 
-    // Toggles the visibility of an order's details section and loads/clears its items.
+    // Toggle order details view
     toggleOrderDetails(order) {
     this.viewOrderDetails(order);
     },
 
-      // Opens the modal for adding multiple items to the selected order.
-      async showAddItems(order) {
-        this.selectedOrder = order; // Set the target order
-        try {
-          // Ensure inventory is loaded before opening the modal
-          if (this.inventory.length === 0) {
-            await this.loadInventory();
-          }
-          // Reset the item selection form and list
-          this.selectedItems = []; 
-          this.itemToAdd = { SKU_Number: '', QTY: 1 };
-          this.showAddItemsModal = true; // Open the modal
-          console.log('Available items for adding:', this.availableItems); 
-        } catch (error) {
-          console.error('Error preparing to add items:', error);
-          this.error.inventory = 'Failed to load inventory items';
-          alert('Error loading inventory. Cannot add items.');
+    // Show add items modal
+    async showAddItems(order) {
+      this.selectedOrder = order;
+      try {
+        if (this.inventory.length === 0) {
+          await this.loadInventory();
         }
-      },
-    // Prepares the edit item modal with the selected item's data.
+        this.selectedItems = []; 
+        this.itemToAdd = { SKU_Number: '', QTY: 1 };
+        this.showAddItemsModal = true;
+        console.log('Available items for adding:', this.availableItems); 
+      } catch (error) {
+        console.error('Error preparing to add items:', error);
+        this.error.inventory = 'Failed to load inventory items';
+        alert('Error loading inventory. Cannot add items.');
+      }
+    },
+
+    // Edit an order item
     editOrderItem(item) {
       this.editItemForm = {
-        OrderID: this.expandedOrder,         // Get OrderID from the currently expanded order
+        OrderID: this.expandedOrder,
         SKU_Number: item.SKU_Number,
-        QTY: item.QTY || 1,       // Use existing quantity or default to 1
-        originalSKU: item.SKU_Number      // Store the original SKU
+        QTY: item.QTY || 1,
+        originalSKU: item.SKU_Number
       };
       this.showEditItemModal = true;
     },
 
-    // Closes the edit item modal and resets the form data.
+    // Cancel item editing
     cancelEditItem() {
       this.showEditItemModal = false;
-      this.editItemForm = { // Reset form
+      this.editItemForm = {
         OrderID: null,
         SKU_Number: null,
         QTY: 1,
@@ -726,57 +710,51 @@ export default {
       };
     },
 
-    // Saves the edited order item via API (replaces old item with new details).
-async saveEditedItem() {
-  try {
-    // Add more debugging to see exactly what's happening
-    console.log('Edit Item Form Data:', {
-      OrderID: this.editItemForm.OrderID,
-      SKU_Number: this.editItemForm.SKU_Number, 
-      originalSKU: this.editItemForm.originalSKU,
-      QTY: this.editItemForm.QTY
-    });
-    
-    // Make sure QTY is defined and valid
-    if (!this.editItemForm.QTY || isNaN(Number(this.editItemForm.QTY)) || this.editItemForm.QTY < 1) {
-      alert('Please enter a valid quantity (minimum 1)');
-      return;
-    }
+    // Save edited item
+    async saveEditedItem() {
+      try {
+        console.log('Edit Item Form Data:', {
+          OrderID: this.editItemForm.OrderID,
+          SKU_Number: this.editItemForm.SKU_Number, 
+          originalSKU: this.editItemForm.originalSKU,
+          QTY: this.editItemForm.QTY
+        });
+        
+        if (!this.editItemForm.QTY || isNaN(Number(this.editItemForm.QTY)) || this.editItemForm.QTY < 1) {
+          alert('Please enter a valid quantity (minimum 1)');
+          return;
+        }
 
-    // If we're not changing the SKU, set it to the original to avoid confusion
-    const requestBody = {
-      QTY: Number(this.editItemForm.QTY)
-    };
-    
-    // Only include skuNumber if it's actually changing
-    if (this.editItemForm.SKU_Number !== this.editItemForm.originalSKU) {
-      requestBody.skuNumber = this.editItemForm.SKU_Number;
-    }
-    
-    console.log('Sending update request:', {
-      url: `/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`,
-      body: requestBody
-    });
-    
-    // Call the PUT endpoint
-    await api.fetchData(`/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
+        const requestBody = {
+          QTY: Number(this.editItemForm.QTY)
+        };
+        
+        if (this.editItemForm.SKU_Number !== this.editItemForm.originalSKU) {
+          requestBody.skuNumber = this.editItemForm.SKU_Number;
+        }
+        
+        console.log('Sending update request:', {
+          url: `/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`,
+          body: requestBody
+        });
+        
+        await api.fetchData(`/orderitems/${this.editItemForm.OrderID}/${this.editItemForm.originalSKU}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
 
-    // Refresh the order items
-    await this.loadOrderItems(this.expandedOrder); 
-    await this.loadInventory();
+        await this.loadOrderItems(this.expandedOrder); 
+        await this.loadInventory();
 
-    this.cancelEditItem();
-  } catch (error) {
-    console.error('Error updating order item:', error);
-    alert(`Error updating order item: ${error.message}`);
-  }
-},
+        this.cancelEditItem();
+      } catch (error) {
+        console.error('Error updating order item:', error);
+        alert(`Error updating order item: ${error.message}`);
+      }
+    },
 
-    // Closes the 'Add Items' modal and clears the selection list and form.
+    // Cancel add items
     cancelAddItems() {
       this.showAddItemsModal = false;
       this.selectedOrder = null;
@@ -784,145 +762,127 @@ async saveEditedItem() {
       this.itemToAdd = { SKU_Number: '', QTY: 1 };
     },
     
-    // Helper method: Calculates max quantity for the item selected in the 'Add Items' modal.
+    // Get max available quantity
     getMaxQuantity() {
-      if (!this.itemToAdd.SKU_Number) return 1; // No item selected
+      if (!this.itemToAdd.SKU_Number) return 1;
       const item = this.inventory.find(item => item.SKU_Number === this.itemToAdd.SKU_Number);
-      return item ? item.Item_Quantity : 1; // Return available quantity or 1 if not found
+      return item ? item.Item_Quantity : 1;
     },
 
-    // Adds the currently selected item and quantity to the temporary list in the 'Add Items' modal.
+    // Add item to selection list
     addToItemsList() {
-      if (!this.itemToAdd.SKU_Number || this.itemToAdd.QTY < 1) return; // Validation
+      if (!this.itemToAdd.SKU_Number || this.itemToAdd.QTY < 1) return;
 
       const existingIndex = this.selectedItems.findIndex(
         item => item.SKU_Number === this.itemToAdd.SKU_Number
       );
 
       if (existingIndex >= 0) {
-        // If item already in list, update its quantity
-        // TODO: Add check against available inventory if necessary
         this.selectedItems[existingIndex].QTY += this.itemToAdd.QTY;
       } else {
-        // If new item, add it to the list
         this.selectedItems.push({
           SKU_Number: this.itemToAdd.SKU_Number,
           QTY: this.itemToAdd.QTY
         });
       }
 
-      // Reset the form for the next item
       this.itemToAdd = { SKU_Number: '', QTY: 1 };
     },
 
-    // Removes an item from the temporary list in the 'Add Items' modal based on its index.
+    // Remove item from selection list
     removeItemFromList(index) {
       this.selectedItems.splice(index, 1);
     },
 
-    // Submits the list of selected items (with quantities) from the modal to the backend API.
+    // Add selected items to order
     async addItemsToOrder() {
-  if (this.selectedItems.length === 0) {
-    alert('Please add at least one item to the list.');
-    return;
-  }
+      if (this.selectedItems.length === 0) {
+        alert('Please add at least one item to the list.');
+        return;
+      }
 
-  try {
-    // Format the date for MySQL
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
-    
-    // Reset the modal first - this should happen immediately
-    const orderID = this.selectedOrder.OrderID;
-    const isExpanded = this.expandedOrder === orderID;
-    
-    // Close the modal immediately
-    this.showAddItemsModal = false;
-    
-    // Iterate through the list of items to add
-    for (const item of this.selectedItems) {
-      await api.fetchData('/orderitems', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          skuNumber: item.SKU_Number,
-          orderID: orderID,
-          QTY: item.QTY,
-          dateAdded: formattedDate,
-          dateUsed: null
-        })
-      });
-    }
+      try {
+        const now = new Date();
+        const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
+        
+        const orderID = this.selectedOrder.OrderID;
+        const isExpanded = this.expandedOrder === orderID;
+        
+        this.showAddItemsModal = false;
+        
+        for (const item of this.selectedItems) {
+          await api.fetchData('/orderitems', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              skuNumber: item.SKU_Number,
+              orderID: orderID,
+              QTY: item.QTY,
+              dateAdded: formattedDate,
+              dateUsed: null
+            })
+          });
+        }
 
-    // Update the order's lastModified date
-    await api.fetchData(`/orders/${orderID}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lastModified: formattedDate
-      })
-    });
+        await api.fetchData(`/orders/${orderID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lastModified: formattedDate
+          })
+        });
 
-    // Refresh data
-    await Promise.all([
-      this.loadInventory(),
-      this.loadOrders()
-    ]);
-    
-    // Refresh order items if needed
-    if (isExpanded) {
-      await this.loadOrderItems(orderID);
-    }
-    
-    // Reset state variables
-    this.selectedOrder = null;
-    this.selectedItems = [];
-    this.itemToAdd = { SKU_Number: '', QTY: 1 };
-    
-  } catch (error) {
-    console.error('Error adding items to order:', error);
-    alert(`Error adding items to order: ${error.message}`);
-    
-    // Make sure to close the modal even on error
-    this.showAddItemsModal = false;
-    this.selectedOrder = null;
-    this.selectedItems = [];
-    this.itemToAdd = { SKU_Number: '', QTY: 1 };
-  }
-},
+        await Promise.all([
+          this.loadInventory(),
+          this.loadOrders()
+        ]);
+        
+        if (isExpanded) {
+          await this.loadOrderItems(orderID);
+        }
+        
+        this.selectedOrder = null;
+        this.selectedItems = [];
+        this.itemToAdd = { SKU_Number: '', QTY: 1 };
+        
+      } catch (error) {
+        console.error('Error adding items to order:', error);
+        alert(`Error adding items to order: ${error.message}`);
+        
+        this.showAddItemsModal = false;
+        this.selectedOrder = null;
+        this.selectedItems = [];
+        this.itemToAdd = { SKU_Number: '', QTY: 1 };
+      }
+    },
 
-      // View Order Details in Modal
-      viewOrderDetails(order) {
+    // View order details
+    viewOrderDetails(order) {
       this.selectedOrder = order;
       this.expandedOrder = order.OrderID;
       this.loadOrderItems(order.OrderID);
       this.showOrderDetailsModal = true;
     },
 
-    //Close Order Details modal
-      closeOrderDetails() {
+    // Close order details modal
+    closeOrderDetails() {
       this.showOrderDetailsModal = false;
       this.expandedOrder = null;
       this.orderItems = [];
     },
 
-    
-
-     // Add a method to mark items as used (by technician)
-     async markItemAsUsed(item) {
+    // Mark an item as used by technician
+    async markItemAsUsed(item) {
       try {
         await api.markItemAsUsed(this.expandedOrder, item.SKU_Number);
-        
-        // Refresh order items
         await this.loadOrderItems(this.expandedOrder);
-        
       } catch (error) {
         console.error('Error marking item as used:', error);
         alert(`Error updating item status: ${error.message}`);
       }
     },
 
-    // Saves a new order or updates an existing order's core details (Customer, Rep, Tech) via API.
+    // Save or update an order
     async saveOrder() {
       try {
         // Set creation date for new orders
@@ -930,7 +890,7 @@ async saveEditedItem() {
           this.orderForm.DateCreated = new Date().toISOString();
         }
         
-        // If a technician is assigned and there wasn't one before, update assignment date
+        // Update assignment date if technician changed
         if (this.orderForm.TechID && 
             (!this.editingOrder || !this.editingOrder.TechID || 
              this.editingOrder.TechID !== this.orderForm.TechID)) {
@@ -944,7 +904,7 @@ async saveEditedItem() {
           dateCreated: this.orderForm.DateCreated,
           dateAssigned: this.orderForm.DateAssigned,
           dateCompleted: this.orderForm.DateCompleted,
-          lastModified: new Date().toISOString() // Always update lastModified
+          lastModified: new Date().toISOString()
         };
 
         if (this.editingOrder) {
@@ -963,55 +923,52 @@ async saveEditedItem() {
           });
         }
 
-        await this.loadOrders(); // Refresh the main orders list
-        this.cancelOrderForm(); // Close the modal and reset form
+        await this.loadOrders();
+        this.cancelOrderForm();
       } catch (error) {
         console.error('Error saving order:', error);
         alert(`Error saving order: ${error.message}`);
       }
     },
 
-        // Add a method to complete an order
-        async completeOrder(orderID) {
-          if (confirm('Are you sure you want to complete this order? Unused items will be returned to inventory.')) {
-            try {
-              const result = await api.completeOrder(orderID);
-              
-              // Provide feedback to the user
-              if (result.itemsReturned > 0) {
-                alert(`Order completed. ${result.itemsReturned} unused items were returned to inventory.`);
-              } else {
-                alert('Order completed successfully.');
-              }
-              
-              // Refresh orders and inventory
-              await this.loadOrders();
-              await this.loadInventory();
-              
-              // Close the order details modal if it's open
-              if (this.showOrderDetailsModal && this.selectedOrder && this.selectedOrder.OrderID === orderID) {
-                this.closeOrderDetails();
-              }
-            } catch (error) {
-              console.error('Error completing order:', error);
-              alert(`Error completing order: ${error.message}`);
-            }
+    // Complete an order
+    async completeOrder(orderID) {
+      if (confirm('Are you sure you want to complete this order? Unused items will be returned to inventory.')) {
+        try {
+          const result = await api.completeOrder(orderID);
+          
+          if (result.itemsReturned > 0) {
+            alert(`Order completed. ${result.itemsReturned} unused items were returned to inventory.`);
+          } else {
+            alert('Order completed successfully.');
           }
-        },
+          
+          await this.loadOrders();
+          await this.loadInventory();
+          
+          if (this.showOrderDetailsModal && this.selectedOrder && this.selectedOrder.OrderID === orderID) {
+            this.closeOrderDetails();
+          }
+        } catch (error) {
+          console.error('Error completing order:', error);
+          alert(`Error completing order: ${error.message}`);
+        }
+      }
+    },
 
-    // Deletes an entire order via API call after confirmation.
+    // Delete an order
     async deleteOrder(orderID) {
       if (confirm('Are you sure you want to delete this entire order? This action cannot be undone.')) {
         try {
           await api.fetchData(`/orders/${orderID}`, {
             method: 'DELETE'
           });
-          // If the deleted order was expanded, collapse the details section
+
           if (this.expandedOrder === orderID) {
              this.expandedOrder = null;
              this.orderItems = [];
           }
-          await this.loadOrders(); // Refresh the orders list
+          await this.loadOrders();
         } catch (error) {
           console.error('Error deleting order:', error);
           alert(`Error deleting order: ${error.message}`);
@@ -1019,11 +976,10 @@ async saveEditedItem() {
       }
     },
 
-    // Closes the main order create/edit modal and resets its form data and editing state.
+    // Cancel order form
     cancelOrderForm() {
-      this.editingOrder = null; // Clear editing state
-      this.showOrderCreateForm = false; // Hide modal
-      // Reset form fields
+      this.editingOrder = null;
+      this.showOrderCreateForm = false;
       this.orderForm = {
         CustomerID: '',
         SalesRepID: '',
@@ -1032,7 +988,7 @@ async saveEditedItem() {
       };
     },
 
-// Format date for display
+    // Format date for display
     formatDate(dateString) {
       if (!dateString) return 'N/A';
       
@@ -1045,8 +1001,6 @@ async saveEditedItem() {
         minute: '2-digit'
       }).format(date);
     }
-
- 
   }
 }
 
@@ -1058,25 +1012,25 @@ async saveEditedItem() {
 .item-selection-area {
   display: flex;
   gap: 1rem;
-  align-items: flex-end; /* Align button with bottom of inputs */
+  align-items: flex-end;
   margin-bottom: 1.5rem;
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  flex-wrap: wrap;
 }
 
 .item-selection-area .form-group {
-  flex: 1; /* Allow form groups to grow */
-  min-width: 200px; /* Minimum width before wrapping */
+  flex: 1;
+  min-width: 200px;
 }
 
 .btn-add-item {
-  background-color: #4CAF50; /* Green */
+  background-color: #4CAF50;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
-  height: 38px; /* Match typical input height */
-  white-space: nowrap; /* Prevent text wrapping */
+  height: 38px;
+  white-space: nowrap;
 }
 
 .btn-add-item:hover {
@@ -1098,21 +1052,21 @@ async saveEditedItem() {
 
 .selected-items-list h4 {
   margin-top: 0;
-  margin-bottom: 1rem; /* Increased spacing */
+  margin-bottom: 1rem;
   color: #333;
-  border-bottom: 1px solid #e0e0e0; /* Add separator */
+  border-bottom: 1px solid #e0e0e0;
   padding-bottom: 0.5rem;
 }
 
 .items-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 0.5rem; /* Spacing after header */
+  margin-top: 0.5rem;
 }
 
 .items-table th,
 .items-table td {
-  padding: 0.6rem 0.5rem; /* Slightly more vertical padding */
+  padding: 0.6rem 0.5rem;
   text-align: left;
   border-bottom: 1px solid #ddd;
 }
@@ -1120,15 +1074,15 @@ async saveEditedItem() {
 .items-table th {
   background-color: #f2f2f2;
   font-weight: bold;
-  font-size: 0.9rem; /* Slightly smaller header */
+  font-size: 0.9rem;
 }
 
 .items-table td {
-  vertical-align: middle; /* Align content vertically */
+  vertical-align: middle;
 }
 
 .btn-remove {
-  background-color: #f44336; /* Red */
+  background-color: #f44336;
   color: white;
   border: none;
   padding: 0.3rem 0.6rem;
@@ -1141,15 +1095,15 @@ async saveEditedItem() {
   background-color: #d32f2f;
 }
 
-/* General Form Element Styling (can be in global CSS or scoped here) */
+/* Form element styling */
 input[type="number"],
 select {
   padding: 0.5rem;
   border: 1px solid #ccc;
   border-radius: 4px;
-  width: 100%; /* Make inputs/selects fill their container */
-  box-sizing: border-box; /* Include padding and border in element's total width/height */
-  height: 38px; /* Consistent height */
+  width: 100%;
+  box-sizing: border-box;
+  height: 38px;
 }
 
 .form-actions {
@@ -1159,13 +1113,12 @@ select {
   gap: 1rem;
 }
 
-/* Basic Modal Styling (assuming styles like .modal, .modal-content etc. exist globally or in style.css) */
-
 .loading {
   padding: 1rem;
   text-align: center;
   color: #666;
 }
+
 .error-message {
   padding: 1rem;
   color: red;
@@ -1174,17 +1127,20 @@ select {
   border-radius: 4px;
   margin-bottom: 1rem;
 }
+
 .connection-status {
   padding: 0.5rem 1rem;
   margin-bottom: 1rem;
   border-radius: 4px;
   text-align: center;
 }
+
 .status-connected {
   color: green;
   border: 1px solid green;
   background-color: #e8f5e9;
 }
+
 .status-error {
   color: red;
   border: 1px solid red;
@@ -1192,7 +1148,6 @@ select {
 }
 
 /* Date Filter Styling */
-
 .date-filters {
   margin-bottom: 20px;
   background-color: #f5f5f5;
@@ -1264,8 +1219,7 @@ select {
   background-color: #f57c00;
 }
 
-/*view oeders*/
-
+/* Order details modal */
 .order-details-modal {
   width: 90%;
   max-width: 900px;
@@ -1301,5 +1255,4 @@ select {
   gap: 10px;
   margin-top: 20px;
 }
-
 </style>

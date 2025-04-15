@@ -15,7 +15,7 @@ app.use('/api', apiRoutes);
 app.use('/api/auth', authRoutes)
 
 
-// Password migration function
+// Password migration function - runs each time server booted
 async function migratePasswords() {
   console.log('Checking for passwords that need migration...');
   try {
