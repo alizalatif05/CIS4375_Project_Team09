@@ -2,17 +2,19 @@
   <div class="customer-page">
     <h1>Customer Management</h1>
 
+    <!--Connection Check-->
     <div class="connection-status" v-if="connectionStatus">
       <span :class="connectionStatusClass">{{ connectionStatusMessage }}</span>
     </div>
 
+    <!--Add new customer button-->
     <div class="actions">
       <button @click="showCustomerCreateForm = true" class="create-btn">
         Add New Customer
       </button>
     </div>
 
-    <!--Customers Table-->
+    <!--Customers table-->
     <div class="data-table">
       <h2>Customers</h2>
       <div v-if="loading.customers" class="loading">Loading customers...</div>
@@ -142,6 +144,7 @@ export default {
       }
     };
   },
+
   computed: {
     connectionStatusClass() {
       if (!this.connectionStatus) return '';
