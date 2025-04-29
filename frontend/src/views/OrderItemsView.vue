@@ -135,7 +135,7 @@
                 <tr v-for="item in orderItems" :key="item.SKU_Number">
                   <td>{{ item.ItemName }}</td>
                   <td>{{ item.SKU_Number }}</td>
-                  <td>{{ item.OrderItems_Quantity }}</td>
+                  <td>{{ item.QTY }}</td>
                   <td>{{ formatDate(item.DateAdded) }}</td>
                   <td>{{ formatDate(item.DateUsed) }}</td>
                   <td>
@@ -214,7 +214,7 @@
               <select v-model="itemToAdd.SKU_Number">
                 <option value="">Select an Item</option>
                 <option v-for="item in availableItems" :key="item.SKU_Number" :value="item.SKU_Number">
-                  {{ item.ItemName }} ({{ item.SKU_Number }}) - Available: {{ item.Item_Quantity }}
+                  {{ item.ItemName }} ({{ item.SKU_Number }}) - Available: {{ item.QTY }}
                 </option>
               </select>
             </div>
@@ -520,7 +520,7 @@ export default {
       // Consider current quantity + available stock? Or just available stock? Assuming available stock for now.
       // If editing, it should probably be current quantity + remaining stock. Needs clarification based on backend logic.
       // For simplicity, returning available quantity from inventory.
-      return item ? item.Item_Quantity : 1;
+      return item ? item.QTY : 1;
     },
 
     // Orchestrates loading of all necessary data for the component.
@@ -709,7 +709,7 @@ export default {
       this.editItemForm = {
         OrderID: this.expandedOrder,         // Get OrderID from the currently expanded order
         SKU_Number: item.SKU_Number,
-        QTY: item.OrderItems_QTY || 1,       // Use existing quantity or default to 1
+        QTY: item.QTY || 1,       // Use existing quantity or default to 1
         originalSKU: item.SKU_Number      // Store the original SKU
       };
       this.showEditItemModal = true;
@@ -774,7 +774,7 @@ async saveEditedItem() {
     getMaxQuantity() {
       if (!this.itemToAdd.SKU_Number) return 1; // No item selected
       const item = this.inventory.find(item => item.SKU_Number === this.itemToAdd.SKU_Number);
-      return item ? item.Item_Quantity : 1; // Return available quantity or 1 if not found
+      return item ? item.QTY : 1; // Return available quantity or 1 if not found
     },
 
     // Adds the currently selected item and quantity to the temporary list in the 'Add Items' modal.

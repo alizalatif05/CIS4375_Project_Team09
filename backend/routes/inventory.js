@@ -16,7 +16,7 @@ router.get('/inventory', authenticateUser, async (req, res) => {
     try {
         const { search } = req.query;
         let query = `
-            SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
+            SELECT SKU_Number, ItemName, Item_Desc, QTY 
             FROM Inventory
             WHERE Deleted = 'No'
         `;
@@ -42,7 +42,7 @@ router.get('/inventory', authenticateUser, async (req, res) => {
 router.get('/inventory/:sku', authenticateUser, async (req, res) => {
     try {
         const query = `
-            SELECT SKU_Number, ItemName, Item_Desc, Item_Quantity 
+            SELECT SKU_Number, ItemName, Item_Desc, QTY
             FROM Inventory 
             WHERE SKU_Number = ? AND Deleted = 'No';
         `;
@@ -69,7 +69,7 @@ router.put('/inventory/:id', authenticateUser, async (req, res) => {
 
         const updateQuery = `
             UPDATE Inventory
-            SET ItemName = ?, Item_Quantity = ?, Item_Desc = ?
+            SET ItemName = ?, QTY = ?, Item_Desc = ?
             WHERE SKU_Number = ?;
         `;
 
@@ -98,7 +98,7 @@ router.post('/inventory', authenticateUser, async (req, res) => {
         }
 
         const query = `
-            INSERT INTO Inventory (ItemName, Item_Desc, Item_Quantity) 
+            INSERT INTO Inventory (ItemName, Item_Desc, QTY) 
             VALUES (?, ?, ?);
         `;
 
@@ -311,7 +311,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
         try {
             // First, get the current quantity assigned to the technician
             const [currentRows] = await connection.query(
-                'SELECT Item_Quantity FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
+                'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
                 [oldSku, oldTechId]
             );
 
@@ -320,7 +320,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
                 return res.status(404).json({ message: 'Technician inventory assignment not found or already deleted' });
             }
 
-            const currentQty = currentRows[0].Item_Quantity; // Fixed to use Item_Quantity
+            const currentQty = currentRows[0].QTY; // Fixed to use QTY
 
             // Start building the query
             let query = 'UPDATE TechInventory SET ';
@@ -340,25 +340,25 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
                 // If increasing quantity, check if enough inventory is available
                 if (qtyDifference > 0) {
                     const [invRows] = await connection.query(
-                        'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No" FOR UPDATE',
+                        'SELECT QTY FROM Inventory WHERE SKU_Number = ? AND Deleted = "No" FOR UPDATE',
                         [oldSku]
                     );
 
-                    if (!invRows || invRows.length === 0 || invRows[0].Item_Quantity < qtyDifference) {
+                    if (!invRows || invRows.length === 0 || invRows[0].QTY < qtyDifference) {
                         await connection.rollback();
                         return res.status(400).json({
-                            message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.Item_Quantity ?? 0}`
+                            message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.QTY ?? 0}`
                         });
                     }
                 }
 
-                updates.push('Item_Quantity = ?'); // Fixed to use Item_Quantity
+                updates.push('QTY = ?'); // Fixed to use QTY
                 values.push(newQty);
 
                 // Update main inventory - subtract if increasing, add if decreasing
                 if (qtyDifference !== 0) {
                     await connection.query(
-                        'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                        'UPDATE Inventory SET QTY = QTY - ? WHERE SKU_Number = ?',
                         [qtyDifference, oldSku]
                     );
                 }
@@ -470,7 +470,7 @@ router.get('/techinventory', authenticateUser, async (req, res) => {
                 ti.TechID,
                 i.ItemName,
                 i.Item_Desc,
-                ti.Item_Quantity
+                ti.QTY
             FROM TechInventory ti
             JOIN Inventory i ON ti.SKU_Number = i.SKU_Number
             WHERE ti.Deleted = 'No' AND i.Deleted = 'No';
@@ -484,6 +484,43 @@ router.get('/techinventory', authenticateUser, async (req, res) => {
 });
 
 /**
+ * PUT /api/technicians/:id - Update an existing technician
+ */
+router.put('/technicians/:id', authenticateUser, async (req, res) => {
+    try {
+        const techId = req.params.id;
+        const { Tech_fName, Tech_lName, UserID, Deleted } = req.body;
+
+        if (!Tech_fName || !Tech_lName) {
+            return res.status(400).json({ message: 'First and last name are required' });
+        }
+
+        const query = `
+            UPDATE Technician
+            SET Tech_fName = ?, Tech_lName = ?, UserID = ?, Deleted = ?
+            WHERE TechID = ?;
+        `;
+
+        const [result] = await pool.query(query, [
+            Tech_fName,
+            Tech_lName,
+            UserID || null,
+            Deleted || 'No',
+            techId
+        ]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Technician not found' });
+        }
+
+        return res.status(200).json({ message: 'Technician updated successfully' });
+    } catch (err) {
+        console.error('Database update error:', err);
+        res.status(500).json({ message: 'Database query error', error: err.message });
+    }
+});
+
+/**
  * PUT /api/techinventory/:oldSku/:oldTechId - Update technician's inventory item
  */
 router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, res) => {
@@ -492,7 +529,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
         const { newTechId, newSkuNumber } = req.body;
         
         // Validate parameters
-        if (!Item_Quantity && !newTechId && !newSkuNumber) {
+        if (!QTY && !newTechId && !newSkuNumber) {
             return res.status(400).json({ message: 'At least one field to update is required' });
         }
         
@@ -503,7 +540,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
         try {
             // First, get the current quantity assigned to the technician
             const [currentRows] = await connection.query(
-                'SELECT Item_Quantity FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+                'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
                 [oldSku, oldTechId]
             );
             
@@ -527,14 +564,14 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
                 // If increasing quantity, check if enough inventory is available
                 if (qtyDifference > 0) {
                     const [invRows] = await connection.query(
-                        'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
+                        'SELECT QTY FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
                         [oldSku]
                     );
                     
-                    if (!invRows || invRows.length === 0 || invRows[0].Item_Quantity < qtyDifference) {
+                    if (!invRows || invRows.length === 0 || invRows[0].QTY < qtyDifference) {
                         await connection.rollback();
                         return res.status(400).json({ 
-                            message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.Item_Quantity ?? 0}` 
+                            message: `Insufficient inventory for SKU ${oldSku} to increase assignment by ${qtyDifference}. Available: ${invRows[0]?.QTY ?? 0}`
                         });
                     }
                 }
@@ -545,7 +582,7 @@ router.put('/techinventory/:oldSku/:oldTechId', authenticateUser, async (req, re
                 // Update main inventory - subtract if increasing, add if decreasing
                 if (qtyDifference !== 0) {
                     await connection.query(
-                        'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                        'UPDATE Inventory SET QTY = QTY - ? WHERE SKU_Number = ?',
                         [qtyDifference, oldSku]
                     );
                 }
@@ -612,14 +649,14 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
 
         // 1. Check available quantity in main inventory FOR THE AMOUNT BEING ADDED/ASSIGNED
         const [inventoryRows] = await connection.query(
-            'SELECT Item_Quantity FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
+            'SELECT QTY FROM Inventory WHERE SKU_Number = ? AND Deleted = "No"',
             [skuNumber]
         );
         if (!inventoryRows || inventoryRows.length === 0) {
              await connection.rollback();
             return res.status(404).json({ message: `Inventory item SKU ${skuNumber} not found.` });
         }
-        const availableQuantity = inventoryRows[0].Item_Quantity;
+        const availableQuantity = inventoryRows[0].QTY;
 
         // Check if the amount we want to add/assign NOW is available
         if (quantityToAddOrAssign > availableQuantity) {
@@ -639,12 +676,12 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
                  // Reactivating: Behavior remains the same - set quantity to the requested amount.
                  // Inventory check already passed above for 'quantityToAddOrAssign'.
                 await connection.query(
-                    'UPDATE TechInventory SET Item_Quantity = ?, Deleted = "No" WHERE SKU_Number = ? AND TechID = ?',
+                    'UPDATE TechInventory SET QTY = ?, Deleted = "No" WHERE SKU_Number = ? AND TechID = ?',
                     [quantityToAddOrAssign, skuNumber, techId]
                 );
                  // Decrease main inventory quantity by the amount being assigned now
                  await connection.query(
-                     'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                     'UPDATE Inventory SET QTY = QTY - ? WHERE SKU_Number = ?',
                      [quantityToAddOrAssign, skuNumber]
                  );
                 await connection.commit();
@@ -661,13 +698,13 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
 
                 // Update TechInventory quantity to the NEW TOTAL
                 await connection.query(
-                    'UPDATE TechInventory SET Item_Quantity = ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+                    'UPDATE TechInventory SET QTY = ? WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
                     [newTotalQty, skuNumber, techId]
                 );
 
                  // Adjust main inventory - decrease ONLY by the amount ADDED in this request
                  await connection.query(
-                     'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                     'UPDATE Inventory SET QTY = QTY - ? WHERE SKU_Number = ?',
                      [quantityToAddOrAssign, skuNumber] // Decrease only by the quantity added now
                  );
 
@@ -682,12 +719,12 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
             // New Assignment: Behavior remains the same - assign 'quantityToAddOrAssign'.
             // Inventory check already passed above.
             await connection.query(
-                'INSERT INTO TechInventory (SKU_Number, TechID, Item_Quantity, Deleted) VALUES (?, ?, ?, "No")',
+                'INSERT INTO TechInventory (SKU_Number, TechID, QTY, Deleted) VALUES (?, ?, ?, "No")',
                 [skuNumber, techId, quantityToAddOrAssign]
             );
              // Decrease main inventory quantity
              await connection.query(
-                 'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                 'UPDATE Inventory SET QTY = QTY - ? WHERE SKU_Number = ?',
                  [quantityToAddOrAssign, skuNumber]
              );
             await connection.commit();
@@ -703,7 +740,7 @@ router.post('/techinventory', authenticateUser, async (req, res) => {
          if (err.code === 'ER_DATA_TOO_LONG') {
               return res.status(400).json({ message: 'Input data too long for database field.' });
          }
-         if (err.code === 'ER_CHECK_CONSTRAINT_VIOLATED' || err.message.includes('Item_Quantity_NonNegative')) {
+         if (err.code === 'ER_CHECK_CONSTRAINT_VIOLATED' || err.message.includes('QTY_NonNegative')) {
              return res.status(400).json({ message: `Operation failed: Inventory quantity cannot go below zero for SKU ${skuNumber}.`});
          }
         console.error('Database error during tech inventory assignment:', err);
@@ -728,7 +765,7 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
 
         // 1. Find the quantity being removed from the technician (lock the row)
         const [techInvRows] = await connection.query(
-            'SELECT Item_Quantity FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
+            'SELECT QTY FROM TechInventory WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No" FOR UPDATE',
             [sku, techId]
         );
 
@@ -738,11 +775,11 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
         }
         
         // FIX: Use correct property name - QTY instead of Quantity
-        const quantityToRemove = techInvRows[0].Item_Quantity;
+        const quantityToRemove = techInvRows[0].QTY;
 
         // 2. Soft delete the TechInventory record (set Deleted='Yes', Quantity=0)
         const [result] = await connection.query(
-            'UPDATE TechInventory SET Deleted = "Yes", Item_Quantity = 0 WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
+            'UPDATE TechInventory SET Deleted = "Yes", QTY = 0 WHERE SKU_Number = ? AND TechID = ? AND Deleted = "No"',
             [sku, techId]
         );
 
@@ -755,7 +792,7 @@ router.delete('/techinventory/:sku/:techId', authenticateUser, async (req, res) 
 
          // 3. Add the quantity back to the main Inventory (ensure item exists and is not deleted)
          const [invUpdateResult] = await connection.query(
-             'UPDATE Inventory SET Item_Quantity = Item_Quantity + ? WHERE SKU_Number = ? AND Deleted = "No"',
+             'UPDATE Inventory SET QTY = QTY + ? WHERE SKU_Number = ? AND Deleted = "No"',
              [quantityToRemove, sku]
          );
 
@@ -1052,7 +1089,7 @@ router.get('/orders/:id/items', authenticateUser, async (req, res) => {
     try {
         const orderId = req.params.id;
         const query = `
-            SELECT oi.SKU_Number, oi.OrderID, oi.OrderItems_Quantity, 
+            SELECT oi.SKU_Number, oi.OrderID, oi.QTY, 
                 oi.DateAdded, oi.DateUsed,
                 i.ItemName, i.Item_Desc 
             FROM OrderItems oi
@@ -1074,7 +1111,7 @@ router.get('/orders/:id/items', authenticateUser, async (req, res) => {
 router.get('/orderitems', authenticateUser, async (req, res) => {
     try {
         const query = `
-            SELECT OrderItems.SKU_Number, OrderItems.OrderID, OrderItems.OrderItems_Quantity,
+            SELECT OrderItems.SKU_Number, OrderItems.OrderID, OrderItems.QTY,
                 OrderItems.DateAdded, OrderItems.DateUsed,
                 Inventory.ItemName, Inventory.Item_Desc 
             FROM OrderItems
@@ -1244,20 +1281,20 @@ router.put('/orders/:id/complete', authenticateUser, async (req, res) => {
         
         // 1. Get all items from this order that are marked as used
         const [usedItems] = await connection.query(
-            'SELECT SKU_Number, OrderItems_Quantity FROM OrderItems WHERE OrderID = ? AND DateUsed IS NOT NULL AND Deleted = "No"',
+            'SELECT SKU_Number, QTY FROM OrderItems WHERE OrderID = ? AND DateUsed IS NOT NULL AND Deleted = "No"',
             [orderId]
         );
         
         // 2. Return unused items to inventory
         const [unusedItems] = await connection.query(
-            'SELECT SKU_Number, OrderItems_Quantity FROM OrderItems WHERE OrderID = ? AND DateUsed IS NULL AND Deleted = "No"',
+            'SELECT SKU_Number, QTY FROM OrderItems WHERE OrderID = ? AND DateUsed IS NULL AND Deleted = "No"',
             [orderId]
         );
         
         for (const item of unusedItems) {
             // Return each unused item to inventory
             await connection.query(
-                'UPDATE Inventory SET Item_Quantity = Item_Quantity + ? WHERE SKU_Number = ?',
+                'UPDATE Inventory SET QTY = QTY + ? WHERE SKU_Number = ?',
                 [item.QTY, item.SKU_Number]
             );
         }
@@ -1348,11 +1385,11 @@ router.post('/orderitems', authenticateUser, async (req, res) => {
                 return res.status(404).json({ message: 'Inventory item not found' });
             }
             
-            if (inventoryCheck[0].Item_Quantity < quantity) {
+            if (inventoryCheck[0].QTY < quantity) {
                 await connection.rollback();
                 return res.status(400).json({ 
                     message: 'Not enough inventory available',
-                    available: inventoryCheck[0].Item_Quantity,
+                    available: inventoryCheck[0].QTY,
                     requested: quantity
                 });
             }
@@ -1371,20 +1408,20 @@ router.post('/orderitems', authenticateUser, async (req, res) => {
                 const newQty = existingItem[0].QTY + quantity;
                 
                 await connection.query(
-                    'UPDATE OrderItems SET OrderItems_Quantity = ? WHERE OrderID = ? AND SKU_Number = ?',
+                    'UPDATE OrderItems SET QTY = ? WHERE OrderID = ? AND SKU_Number = ?',
                     [newQty, orderID, skuNumber]
                 );
             } else {
                 // Add new item to order with timestamp
                 await connection.query(
-                    'INSERT INTO OrderItems (OrderID, SKU_Number, OrderItems_Quantity, DateAdded) VALUES (?, ?, ?, ?)',
+                    'INSERT INTO OrderItems (OrderID, SKU_Number, QTY, DateAdded) VALUES (?, ?, ?, ?)',
                     [orderID, skuNumber, quantity, dateAdded || now]
                 );
             }
             
             // Update inventory quantity
             await connection.query(
-                'UPDATE Inventory SET Item_Quantity = Item_Quantity - ? WHERE SKU_Number = ?',
+                'UPDATE Inventory SET QTY = QTY - ? WHERE SKU_Number = ?',
                 [quantity, skuNumber]
             );
             
@@ -1439,7 +1476,7 @@ router.put('/orderitems/:orderId/:sku', authenticateUser, async (req, res) => {
 
             // Handle quantity update
             if (QTY !== undefined && QTY >= 1) {
-                updateFields.push('OrderItems_Quantity = ?');
+                updateFields.push('QTY = ?');
                 updateValues.push(QTY);
             }
 

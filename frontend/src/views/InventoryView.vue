@@ -23,7 +23,7 @@
         </button>
       </div>
 
-      
+
     <!--Inventory table-->
       <div class="data-table">
         <h2>Inventory</h2>
@@ -46,7 +46,7 @@
               <td>{{ item.SKU_Number }}</td>
               <td>{{ item.ItemName }}</td>
               <td>{{ item.Item_Desc }}</td>
-              <td>{{ item.Item_Quantity }}</td>
+              <td>{{ item.QTY }}</td>
               <td>
                 <button @click="viewInventoryDetails(item)" class="btn-view">
                   View
@@ -82,7 +82,7 @@
               </div>
               <div class="form-group">
                 <label>Quantity:</label>
-                <input v-model.number="inventoryForm.Item_Quantity" type="number" required />
+                <input v-model.number="inventoryForm.QTY" type="number" required />
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn-save">Save</button>
@@ -105,7 +105,7 @@
                <p><strong>SKU Number:</strong> {{ selectedInventory.SKU_Number }}</p>
                <p><strong>Item Name:</strong> {{ selectedInventory.ItemName }}</p>
                <p><strong>Description:</strong> {{ selectedInventory.Item_Desc }}</p>
-               <p><strong>Quantity:</strong> {{ selectedInventory.Item_Quantity }}</p>
+               <p><strong>Quantity:</strong> {{ selectedInventory.QTY }}</p>
              </div>
              <div class="form-actions">
                <button @click="editFromDetails(selectedInventory)" class="btn-edit">Edit</button>
@@ -134,9 +134,9 @@
               {{ tech.firstName }} {{ tech.lastName }} ({{ tech.TechID }})
             </option>
           </select>
-          <button 
-            v-if="techFilter.selectedTechId" 
-            @click="techFilter.selectedTechId = ''" 
+          <button
+            v-if="techFilter.selectedTechId"
+            @click="techFilter.selectedTechId = ''"
             class="btn-clear-filter"
           >
             Clear Filter
@@ -146,7 +146,7 @@
 
       <!--Counter -->
       <div v-if="techFilter.selectedTechId" class="filtered-results-count">
-        Showing {{ filteredTechnicianInventory.length }} items 
+        Showing {{ filteredTechnicianInventory.length }} items
       </div>
 
       <div class="data-table">
@@ -172,7 +172,7 @@
               <td>{{ techItem.TechID }}</td>
               <td>{{ techItem.ItemName }}</td>
               <td>{{ techItem.Item_Desc }}</td>
-              <td>{{ techItem.QTY }}</td> 
+              <td>{{ techItem.QTY }}</td>
               <td>
                 <button @click="editTechInventory(techItem)" class="btn-edit">
                   Edit
@@ -247,7 +247,7 @@
                                      v-model="bulkAssignForm.selectedItems"
                                      @change="initializeQuantity(item.SKU_Number)"
                                      />
-                                     {{ item.ItemName }} (SKU: {{ item.SKU_Number }}, Avail: {{ item.Item_Quantity }})
+                                     {{ item.ItemName }} (SKU: {{ item.SKU_Number }}, Avail: {{ item.QTY }})
                                  </span>
                                  <div v-if="isItemSelected(item.SKU_Number)" class="quantity-input">
                                      <label>Qty:</label>
@@ -255,7 +255,7 @@
                                      type="number"
                                      v-model.number="bulkAssignForm.quantities[item.SKU_Number]"
                                      min="1"
-                                     :max="item.Item_Quantity"
+                                     :max="item.QTY"
                                      required
                                      @click.stop />
                                  </div>
@@ -337,18 +337,18 @@
           <div class="modal-body">
             <p><strong>Item:</strong> {{ selectedItem?.ItemName }} (SKU: {{ selectedItem?.SKU_Number }})</p>
             <p><strong>Available Quantity:</strong> {{ selectedItem?.QTY }}</p>
-            
+
             <div class="form-group">
               <label>Quantity to Use:</label>
-              <input 
-                type="number" 
-                v-model.number="markAsUsedForm.quantity" 
-                min="1" 
-                :max="selectedItem?.QTY || 1" 
+              <input
+                type="number"
+                v-model.number="markAsUsedForm.quantity"
+                min="1"
+                :max="selectedItem?.QTY || 1"
                 required
               />
             </div>
-            
+
             <div class="form-group">
             <label>Select Order:</label>
             <select v-model="markAsUsedForm.orderId" required>
@@ -358,11 +358,11 @@
               </option>
             </select>
           </div>
-            
+
             <div class="form-actions">
-              <button 
-                @click="confirmMarkAsUsed" 
-                class="btn-save" 
+              <button
+                @click="confirmMarkAsUsed"
+                class="btn-save"
                 :disabled="!markAsUsedForm.orderId || markAsUsedForm.quantity < 1 || markAsUsedForm.quantity > (selectedItem?.QTY || 0)"
               >
                 Confirm
@@ -428,12 +428,12 @@ export default {
       showTechInventoryCreateForm: false,
       showInventoryCreateForm: false,
 
- 
+
       // Forms for Inventory Tab
       inventoryForm: {
         ItemName: '',
         Item_Desc: '',
-        Item_Quantity: 0
+        QTY: 0
       },
       techInventoryForm: {
         SKU_Number: '',
@@ -464,8 +464,8 @@ export default {
     },
 
     canSubmitUsedForm() {
-    return this.markAsUsedForm.orderId && 
-           this.markAsUsedForm.quantity > 0 && 
+    return this.markAsUsedForm.orderId &&
+           this.markAsUsedForm.quantity > 0 &&
            this.markAsUsedForm.quantity <= (this.selectedItem?.QTY || 0);
   },
 
@@ -473,8 +473,8 @@ export default {
     if (!this.techFilter.selectedTechId) {
       return this.technicianInventory; // Return all if no filter selected
     }
-    
-    return this.technicianInventory.filter(item => 
+
+    return this.technicianInventory.filter(item =>
       item.TechID === this.techFilter.selectedTechId
     );
     },
@@ -543,7 +543,7 @@ export default {
       this.loading.inventory = true;
       this.error.inventory = null;
       try {
-        this.inventory = await api.getInventory(); 
+        this.inventory = await api.getInventory();
         console.log("Inventory loaded:", this.inventory.length, "items");
       } catch (error) {
         console.error('Error loading inventory:', error);
@@ -561,15 +561,15 @@ export default {
       orderId: ''
     };
     this.showMarkAsUsedModal = true;
-    
-    
+
+
     // Load active orders if not already loaded
     if (!this.activeOrders || this.activeOrders.length === 0) {
       this.loadActiveOrders();
     }
   },
 
-  // Load active orders 
+  // Load active orders
   async loadActiveOrders() {
     try {
       this.loading.orders = true;
@@ -586,7 +586,7 @@ export default {
 
     formatDate(dateString) {
     if (!dateString) return 'N/A';
-    
+
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
@@ -594,7 +594,7 @@ export default {
       day: 'numeric'
     }).format(date);
   },
-  
+
 
   // Cancel the operation
   cancelMarkAsUsed() {
@@ -612,7 +612,7 @@ export default {
       alert('Please complete all required fields');
       return;
     }
-    
+
     try {
       // 1. First add the item to the order
       await api.fetchData('/orderitems', {
@@ -627,7 +627,7 @@ export default {
           dateUsed: new Date().toISOString()
         })
       });
-      
+
       // 2. Now remove the item from technician inventory
       // Use the existing PUT endpoint to adjust the quantity
       if (this.markAsUsedForm.quantity < this.selectedItem.QTY) {
@@ -645,13 +645,13 @@ export default {
           method: 'DELETE'
         });
       }
-      
+
       // Show success message
       alert(`Item successfully added to Order #${this.markAsUsedForm.orderId} and marked as used.`);
-      
+
       // Refresh data
       this.loadTechnicianInventory();
-      
+
       // Close modal
       this.cancelMarkAsUsed();
     } catch (error) {
@@ -667,7 +667,7 @@ export default {
     },
     editInventory(item) {
       this.selectedInventory = null;
-      this.editingInventory = { ...item }; 
+      this.editingInventory = { ...item };
       this.inventoryForm = { ...item };
       this.showInventoryCreateForm = true;
     },
@@ -684,7 +684,7 @@ export default {
       try {
         const payload = {
           name: this.inventoryForm.ItemName,
-          quantity: this.inventoryForm.Item_Quantity,
+          quantity: this.inventoryForm.QTY,
           itemDesc: this.inventoryForm.Item_Desc
         };
 
@@ -698,7 +698,7 @@ export default {
           const postPayload = {
               itemName: this.inventoryForm.ItemName,
               itemDesc: this.inventoryForm.Item_Desc,
-              itemQuantity: this.inventoryForm.Item_Quantity
+              itemQuantity: this.inventoryForm.QTY
           };
           await api.fetchData('/inventory', {
             method: 'POST',
@@ -706,8 +706,8 @@ export default {
             body: JSON.stringify(postPayload)
           });
         }
-        await this.loadInventory(); 
-        this.cancelInventoryForm(); 
+        await this.loadInventory();
+        this.cancelInventoryForm();
       } catch (error) {
         console.error('Error saving inventory:', error);
         alert(`Error saving inventory: ${error?.message || error}`);
@@ -728,7 +728,7 @@ export default {
       this.editingInventory = null;
       this.showInventoryCreateForm = false;
       this.selectedInventory = null; // Ensure details modal also closes
-      this.inventoryForm = { ItemName: '', Item_Desc: '', Item_Quantity: 0 }; // Reset form
+      this.inventoryForm = { ItemName: '', Item_Desc: '', QTY: 0 }; // Reset form
     },
 
     // --- Technician Inventory Methods ---
@@ -750,7 +750,7 @@ export default {
       this.loading.technicians = true;
       this.error.technicians = null;
       try {
-        this.technicians = await api.getTechnicians(); 
+        this.technicians = await api.getTechnicians();
         console.log("Technicians loaded:", this.technicians.length);
       } catch (error) {
         console.error('Error loading technicians:', error);
@@ -777,12 +777,12 @@ export default {
       if (this.techInventoryForm.SKU_Number !== this.editingTechInventory.SKU_Number ||
           this.techInventoryForm.TechID !== this.editingTechInventory.TechID) {
         // If primary keys (SKU or TechID) changed, we need to delete and recreate
-        
+
         // First, delete the old record
         await api.fetchData(`/techinventory/${this.editingTechInventory.SKU_Number}/${this.editingTechInventory.TechID}`, {
           method: 'DELETE'
         });
-        
+
         // Then create a new record
         await api.fetchData('/techinventory', {
           method: 'POST',
@@ -821,13 +821,13 @@ export default {
         })
       });
     }
-    
+
     // Reload both inventories to refresh quantities
     await Promise.all([
       this.loadTechnicianInventory(),
-      this.loadInventory()  
+      this.loadInventory()
     ]);
-    
+
     this.cancelTechInventoryForm();
   } catch (error) {
     console.error('Error saving technician inventory:', error);
@@ -944,23 +944,23 @@ export default {
 
       this.processingBulkAssign = true;
       const techId = this.bulkAssignForm.technicianId;
-      
+
       // Debug - check what values are being sent
       console.log("Quantities before processing:", this.bulkAssignForm.quantities);
-      
+
       const itemsToAssign = this.bulkAssignForm.selectedItems.map(sku => {
-        // Ensure proper conversion to a valid number 
+        // Ensure proper conversion to a valid number
         let QTY = parseInt(this.bulkAssignForm.quantities[sku]);
-        
+
         // Log each conversion to debug - FIXED to use QTY
         console.log(`SKU ${sku}: original=${this.bulkAssignForm.quantities[sku]}, converted=${QTY}`);
-        
+
         // Force a minimum of 1 if not valid
         if (isNaN(QTY) || QTY < 1) {
           QTY = 1;
           console.log(`SKU ${sku}: using default quantity 1`);
         }
-        
+
         return {
           skuNumber: sku,
           techId: techId,
@@ -973,7 +973,7 @@ export default {
 
   // Validate quantities before sending
       let validationPassed = true;
-      const inventoryMap = new Map(this.inventory.map(item => [item.SKU_Number, item.Item_Quantity]));
+      const inventoryMap = new Map(this.inventory.map(item => [item.SKU_Number, item.QTY_]));
 
       itemsToAssign.forEach(assignment => {
         const available = inventoryMap.get(assignment.skuNumber);
@@ -1016,7 +1016,7 @@ export default {
 
         await Promise.all([
           // Refresh Inventory
-          this.loadTechnicianInventory(), 
+          this.loadTechnicianInventory(),
           this.loadInventory()
       ]);
 

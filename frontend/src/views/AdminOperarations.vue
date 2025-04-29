@@ -201,18 +201,18 @@
     <button @click="showUserCreateForm = true" class="create-btn">
       Add New User
     </button>
-    
-    
+
+
     <div class="filter-controls">
       <label class="filter-label">
         <input type="checkbox" v-model="showInactiveUsers" @change="applyUserFilters">
         Show Inactive Users
       </label>
       <div class="search-box">
-        <input 
-          type="text" 
-          v-model="userSearchQuery" 
-          placeholder="Search users..." 
+        <input
+          type="text"
+          v-model="userSearchQuery"
+          placeholder="Search users..."
           @input="applyUserFilters"
         />
       </div>
@@ -249,9 +249,9 @@
             <!-- Replace static badge with toggleable switch -->
             <div class="status-toggle">
               <label class="switch">
-                <input 
-                  type="checkbox" 
-                  :checked="user.Deleted === 'No'" 
+                <input
+                  type="checkbox"
+                  :checked="user.Deleted === 'No'"
                   @change="toggleUserStatus(user)"
                 >
                 <span class="slider round"></span>
@@ -336,7 +336,7 @@ import "@/assets/css/style.css";
 import api from '../../services/api.js';
 
 export default {
-  
+
   data() {
     return {
       activeTab: 'technicians',
@@ -451,7 +451,7 @@ methods: {
     console.log('Loading users...');
     this.users = await api.getUsers();
     console.log('Users loaded:', this.users.length);
-    
+
     // Initialize filtered users
     this.applyUserFilters();
   } catch (error) {
@@ -462,31 +462,31 @@ methods: {
   }
 },
 
-  // User filtering and toggling 
+  // User filtering and toggling
 applyUserFilters() {
   if (!this.users) {
     this.filteredUsers = [];
     return;
   }
-  
+
   let result = [...this.users];
-  
+
   // Filter by active/inactive status
   if (!this.showInactiveUsers) {
     result = result.filter(user => user.Deleted === 'No');
   }
-  
+
   // Filter by search query
   if (this.userSearchQuery.trim()) {
     const query = this.userSearchQuery.toLowerCase();
-    result = result.filter(user => 
+    result = result.filter(user =>
       (user.User_fName && user.User_fName.toLowerCase().includes(query)) ||
       (user.User_lName && user.User_lName.toLowerCase().includes(query)) ||
       (user.Username && user.Username.toLowerCase().includes(query)) ||
       (user.UserType && user.UserType.toLowerCase().includes(query))
     );
   }
-  
+
   this.filteredUsers = result;
 },
 
@@ -499,19 +499,19 @@ async toggleUserStatus(user) {
       UserType: user.UserType,
       Deleted: user.Deleted === 'No' ? 'Yes' : 'No' // Toggle the status
     };
-    
+
     await api.updateUser(user.UserID, updatedUser);
-    
+
     // Update the local user object to reflect the change
     user.Deleted = updatedUser.Deleted;
-    
+
     // Show success message
     const status = updatedUser.Deleted === 'No' ? 'activated' : 'deactivated';
     console.log(`User ${user.Username} has been ${status}.`);
   } catch (error) {
     console.error('Error toggling user status:', error);
     alert(`Error changing user status: ${error.message}`);
-    
+
   // Revert the visual change
     this.loadUsers();
   }
@@ -549,14 +549,14 @@ async toggleUserStatus(user) {
     }
   },
 
-  
+
   editUser(user) {
     this.editingUser = user;
     this.userForm = {
       User_fName: user.User_fName,
       User_lName: user.User_lName,
       Username: user.Username,
-      UserPassword: '', 
+      UserPassword: '',
       UserType: user.UserType,
       Deleted: user.Deleted
     };
@@ -620,10 +620,10 @@ async toggleUserStatus(user) {
   editTechnician(tech) {
     this.editingTech = tech;
     this.techForm = {
-      firstName: tech.Tech_fName,
-      lastName: tech.Tech_lName,
-      UserID: tech.UserID,
-      Deleted: tech.Deleted || 'No'
+        firstName: tech.firstName,
+        lastName: tech.lastName,
+        UserID: tech.UserID,
+        Deleted: tech.Deleted || 'No'
     };
     this.showTechCreateForm = true;
   },
